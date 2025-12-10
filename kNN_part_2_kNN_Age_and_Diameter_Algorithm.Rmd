@@ -1,0 +1,802 @@
+---
+title: "kNN Age and Diameter Algorithms"
+author: "Sven Rodne"
+date: "2024-08-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Library load
+
+```{r, warning=FALSE}
+library(dplyr)
+library(caret)
+library(tidyverse)
+library(FNN)
+library(class)
+library(ggplot2)
+library(boot)
+library(dplR)
+```
+
+Rip out the unholy
+
+```{r}
+detach("package:Rmisc", unload = TRUE)
+detach("package:plyr", unload = TRUE)
+```
+
+
+# Set seed
+
+```{r}
+# Clear the runway and set the seed
+rm(list=ls())
+set.seed(12345)
+```
+
+# Do the mess around
+
+```{r}
+# Load data
+# ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")
+# rmse = 37.618 & r2 = 0.488
+# ("rodne_nid", "true_age", "rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")
+# rmse = 38.233 & r2 = 0.464
+# ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "elevation", "deficit") 
+# rmse = 37.605 & r2 = 0.488
+# ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "elevation")
+# rmse = 37.161 & r2 = 0.494
+# ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "deficit")
+# rmse = 39.188 & r2 = 0.454
+# ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "elevation", "tpi")
+# rmse = 37.144 & r2 = 0.494
+# ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "elevation", "tpi", "insol")
+# rmse = 37.131 & r2 = 0.495
+# ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "elevation", "insol")
+# rmse = 37.149 & r2 = 0.494
+# ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "tpi", "insol")
+# rmse = 31.670 & r2 = 0.644
+# This one -> # ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "tpi")
+# rmse = 31.256 & r2 = 0.664
+# ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "insol")
+# rmse = 31.666 & r2 = 0.637
+# ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm")
+# rmse = 31.787 & r2 = 0.645
+# ("rodne_nid", "true_age", "rodne_site_ab", "rodne_pid", "spcd_mod", "diam_cm", "tpi")
+# rmse = 36.749 & r2 = 0.497
+# ("rodne_nid", "true_age", "rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")
+```
+
+Prior glance at the age data
+
+```{r}
+# Looking at the input tree data that goes into the age model
+# Load full data
+rogue <- read.csv("csv_output_deck/rogue_trees.csv")
+
+# Filter for true age and useful columns
+rogue_known <- subset(rogue, !is.na(true_age))
+cols_to_keep <- c("rodne_uid", "trid", "stid", "true_age", "spcd_mod", "pvt", "spcd", "diam_cm", "elevation", "deficit", "tpi", "insol")
+rogue_known <- rogue_known %>%
+  select(all_of(cols_to_keep))
+
+# Summaries
+table(rogue_known$spcd_mod)
+table(rogue_known$pvt)
+table(rogue$pvt)
+table(rogue$biostrat)
+
+```
+
+
+# This is the run for kNN on test age data and then the overall data
+
+```{r}
+# Load data
+rogue <- read.csv("csv_output_deck/rogue_trees.csv")
+rogue$rodne_nid <- as.numeric(factor(rogue$rodne_uid))
+rogue_original <- rogue
+
+# Relevant variables for aging
+cols_to_keep <- c("rodne_nid", "true_age", "rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")
+# RMSE = 36.804 & R2 = 0.5701
+
+# Filtering the data for the variable columns
+rogue <- rogue %>%
+  select(all_of(cols_to_keep))
+
+# Fix Data Structure
+rogue <- rogue %>%
+  mutate(.,
+         rodne_pid = as.numeric(as.factor(rodne_pid)),
+         #plot_size = as.numeric(plot_size),
+         #rodne_uid = as.numeric(factor(rodne_uid)),
+         #spcd = as.numeric(factor(spcd)),
+         #capo_num = as.numeric(capo_num),
+         #pvt = as.numeric(as.factor(pvt)),
+         tpi = as.numeric(as.factor(tpi)),
+         #sdi_acre = as.numeric(sdi_acre),
+         elevation = as.numeric(elevation),
+         insol = as.numeric(as.factor(insol)),
+         #plantassoc = as.numeric(as.factor(plantassoc)),
+         #geohash = as.numeric(as.factor(geohash)),
+         #bps = as.numeric(as.factor(bps)),
+         #tpa = as.numeric(tpa),
+         #end_year = as.numeric(end_year),
+         #basal_area_acre = as.numeric(basal_area_acre),
+         #rodne_site_ab = as.numeric(factor(rodne_site_ab)),
+         true_age = as.numeric(true_age),
+         spcd_mod = as.numeric(as.factor(spcd_mod)),
+         diam_cm = as.numeric(diam_cm))
+
+# Separate the data into known and unknown true_age
+rogue_known <- subset(rogue, !is.na(true_age))
+rogue_unknown <- subset(rogue, is.na(true_age))
+
+# Remove the response variable from the unknown data
+rogue_unknown <- rogue_unknown[, !(names(rogue_unknown) %in% 'true_age')]
+
+# Split the known data into training and test sets
+set.seed(12345)
+train_index <- createDataPartition(rogue_known$true_age, p = 0.9, list = FALSE)
+train_data <- rogue_known[train_index, ]
+test_data <- rogue_known[-train_index, ]
+
+# Define RMSE function
+rmse <- function(actual, predicted) {
+  sqrt(mean((actual - predicted)^2))
+}
+
+# Response variable
+train_y <- train_data$true_age
+test_y <- test_data$true_age
+
+# Find the best k
+k_values <- 1:20
+rmse_values <- sapply(k_values, function(k) {
+  predictions <- knn(
+    train = train_data[, -which(names(train_data) == 'true_age')],
+    test = test_data[, -which(names(test_data) == 'true_age')],
+    cl = train_y,
+    k = k)
+  return(rmse(test_y, as.numeric(as.character(predictions))))
+})
+
+# Best k value
+best_age_k <- k_values[order(rmse_values)[1]]
+
+# Plot the rmse values for each k value
+rmse_k <- data.frame(x = k_values, y = rmse_values)
+ggplot(rmse_k, aes(x = x, y = y)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Plotted RMSE values for each level of k",
+       x = "k value",
+       y = "RMSE value") +
+  theme_minimal()
+
+################################################################################
+################################################################################\
+# Test Run
+
+# Function to perform k-NN prediction on test_data
+knn_predict <- function(train_data, test_data, k) {
+  #predictors <- setdiff(names(train_data), "true_age")
+  #nn <- get.knnx(data = train_data[, predictors],
+  nn <- get.knnx(data = train_data[, c("rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")],
+                 query = test_data[, c("rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")],
+                 k = best_age_k)
+  predicted_ages <- apply(nn$nn.index, 1, function(idx) {
+    mean(train_data$true_age[idx])
+  })
+  return(predicted_ages)
+}
+
+# Perform bootstrap resampling and predictions
+n_bootstrap <- 1000
+bootstrap_predictions <- replicate(n_bootstrap, {
+  bootstrap_sample <- train_data[sample(nrow(train_data), replace = TRUE), ]
+  knn_predict(bootstrap_sample, test_data, k)
+})
+
+# Calculate the mean prediction and confidence intervals
+predicted_ages_mean <- apply(bootstrap_predictions, 1, mean)
+predicted_ages_lower <- apply(bootstrap_predictions, 1, function(x) quantile(x, 0.025))
+predicted_ages_upper <- apply(bootstrap_predictions, 1, function(x) quantile(x, 0.975))
+
+# Adding the generated mean prediction and 95% confidence intervals
+test_data <- test_data %>%
+  mutate(predicted_age = predicted_ages_mean,
+         ci_age_lower = predicted_ages_lower,
+         ci_age_upper = predicted_ages_upper)
+
+################################################################################
+
+# Plot actual vs. predicted with confidence intervals for test_data
+ggplot(test_data, aes(x = true_age, y = predicted_age)) +
+  geom_point(aes(color = "Predicted"), alpha = 0.6) +
+  geom_errorbar(aes(ymin = ci_age_lower, ymax = ci_age_upper), width = 0.2, color = "blue", alpha = 0.4) +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(title = "Actual vs. Predicted True Age with Confidence Intervals",
+       x = "True Age",
+       y = "Predicted Age")
+
+# Finding error and R2
+error_trees <- test_data %>%
+  filter(true_age>1) %>%
+  filter(predicted_age>1)
+
+# Mean Absolute Error (MAE)
+age_test_mae <- mean(abs(error_trees$predicted_age - error_trees$true_age))
+
+# Mean Squared Error (MSE)
+age_test_mse <- mean((error_trees$predicted_age - error_trees$true_age)^2)
+
+# Root Mean Squared Error (RMSE)
+age_test_rmse <- sqrt(age_test_mse)
+
+# Mean Absolute Percentage Error (MAPE)
+age_test_mape <- mean(abs((error_trees$predicted_age - error_trees$true_age) / error_trees$true_age)) * 100
+
+# Get the R-squared value
+lm_model <- lm(predicted_age ~ true_age, data = error_trees)
+age_test_r2 <- summary(lm_model)$r.squared
+age_test_r2
+
+################################################################################
+################################################################################
+# Rogue Run
+
+# Function to perform k-NN prediction on rogue
+knn_predict <- function(rogue_known, rogue, k) {
+  #predictors <- setdiff(names(rogue_known), "true_age")
+  nn <- get.knnx(data = rogue_known[, c("rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")],
+                 query = rogue[, c("rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")],
+                 k = best_age_k)
+  predicted_ages <- apply(nn$nn.index, 1, function(idx) {
+    mean(rogue_known$true_age[idx])
+  })
+  return(predicted_ages)
+}
+
+# Perform bootstrap resampling and predictions
+n_bootstrap <- 1000
+bootstrap_predictions <- replicate(n_bootstrap, {
+  bootstrap_sample <- rogue_known[sample(nrow(rogue_known), replace = TRUE), ]
+  knn_predict(bootstrap_sample, rogue, k)
+})
+
+# Calculate the mean prediction and confidence intervals
+predicted_ages_mean <- apply(bootstrap_predictions, 1, mean)
+predicted_ages_lower <- apply(bootstrap_predictions, 1, function(x) quantile(x, 0.025))
+predicted_ages_upper <- apply(bootstrap_predictions, 1, function(x) quantile(x, 0.975))
+
+# Adding the generated mean prediction and 95% confidence intervals
+rogue <- rogue %>%
+  mutate(predicted_age = predicted_ages_mean,
+         ci_age_lower = predicted_ages_lower,
+         ci_age_upper = predicted_ages_upper)
+
+#################
+
+# Plot actual vs. predicted with confidence intervals
+ggplot(rogue, aes(x = true_age, y = predicted_age)) +
+  geom_point(aes(color = "Predicted"), alpha = 0.6) +
+  geom_errorbar(aes(ymin = ci_age_lower, ymax = ci_age_upper), width = 0.2, color = "blue", alpha = 0.4) +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(title = "Actual vs. Predicted True Age with Confidence Intervals",
+       x = "True Age",
+       y = "Predicted Age")
+
+# Finding error and R2
+error_trees <- rogue %>%
+  filter(true_age>1) %>%
+  filter(predicted_age>1)
+
+# Mean Absolute Error (MAE)
+age_rogue_mae <- mean(abs(error_trees$predicted_age - error_trees$true_age))
+
+# Mean Squared Error (MSE)
+age_rogue_mse <- mean((error_trees$predicted_age - error_trees$true_age)^2)
+
+# Root Mean Squared Error (RMSE)
+age_rogue_rmse <- sqrt(age_rogue_mse)
+
+# Mean Absolute Percentage Error (MAPE)
+age_rogue_mape <- mean(abs((error_trees$predicted_age - error_trees$true_age) / error_trees$true_age)) * 100
+
+# Get the R-squared value
+lm_model <- lm(predicted_age ~ true_age, data = error_trees)
+age_rogue_r2 <- summary(lm_model)$r.squared
+age_rogue_r2
+
+################################################################################
+# Returning the model age back to the original data and removing rodne_nid
+
+# Getting rid of the rest of the columns
+rogue <- rogue[c("rodne_nid", "ci_age_lower", "predicted_age", "ci_age_upper")]
+
+# Merging rogue to rogue_original 
+rogue_trees <- merge(rogue_original, rogue, by = "rodne_nid", all.x = TRUE)
+
+# Generate pred_pith
+rogue_trees$predicted_age <- round(rogue_trees$predicted_age)
+rogue_trees$pred_pith <- rogue_trees$end_year - rogue_trees$predicted_age
+
+# Reviewing some of the data
+see_rogue <- rogue_trees[c("diam_cm", "spcd", "rodne_pid", "true_age", "ci_age_lower", "predicted_age", "ci_age_upper")]
+
+# End of Age kNN Model
+```
+
+# Midpoint save for the aged rogue_trees prior to adding the 1911 diameters from cores
+
+```{r}
+write.csv(rogue_trees, "csv_output_deck/agedroguetrees.csv", row.names = FALSE)
+```
+
+# Calculate and add the 1911 and 1850 diameters from cored trees
+
+```{r}
+# Read data
+rogue_trees <- read.csv("csv_output_deck/agedroguetrees.csv")
+mastall <- read.rwl("Chronologies/MAST_ALL.rwl")
+mastall[is.na(mastall)] <- 0
+mastall$year <- as.numeric(row.names(mastall))  # Ensure 'year' is numeric
+sorted_colnames <- sort(setdiff(names(mastall), "year"))
+mastall <- mastall %>% select(year, all_of(sorted_colnames))
+
+# Initialize list to log modified trees
+modified_trees_log <- list()
+
+# Loop over each tree in rogue_trees
+for (i in seq_len(nrow(rogue_trees))) {
+  tree <- rogue_trees$rodne_sid[i]
+  pith_year <- rogue_trees$pith[i]
+  inner_ring_year <- rogue_trees$inner_ring[i]
+  d2pith_cm <- rogue_trees$d2pith_cm[i]
+  
+  # Check if inner_ring is not equal to pith
+  if (!is.na(pith_year) && !is.na(inner_ring_year) && inner_ring_year != pith_year) {
+    # Calculate the constant value for this tree
+    constant_value <- (inner_ring_year - pith_year) / (d2pith_cm * 10)
+    
+    # Calculate the missing years (rows to add)
+    missing_years <- seq(from = pith_year, to = inner_ring_year - 1)
+    
+    # Create a new dataframe for these missing years, with the constant value for this tree
+    new_rows <- data.frame(year = missing_years, stringsAsFactors = FALSE)
+    new_rows[[tree]] <- constant_value
+    
+    # Log the modification for this tree
+    modified_trees_log[[tree]] <- list(
+      "new_years" = missing_years,
+      "constant_value" = constant_value
+    )
+    
+    # Bind the new rows to mastall
+    mastall <- bind_rows(mastall, new_rows)
+  }
+}
+
+# Sort mastall by year after adding the new rows
+mastall <- mastall %>% arrange(year)
+
+# Print or review the log of modified trees
+print(modified_trees_log)
+
+# Zero out the NAs
+mastall[is.na(mastall)] <- 0
+
+# Get earliest measurement year for each tree
+earliest_measurements <- mastall %>%
+  pivot_longer(!year, names_to = "rodne_sid", values_to = "measurement") %>%
+  dplyr::filter(measurement != 0) %>%
+  dplyr::group_by(rodne_sid) %>%
+  dplyr::summarize(earliest_year = min(year))
+
+# Filter rogue_trees for matching pith and earliest measurement year
+valid_trees <- rogue_trees %>%
+  dplyr::filter(!is.na(rodne_sid) & !is.na(pith)) %>%
+  dplyr::left_join(earliest_measurements, by = "rodne_sid") #%>%
+  #dplyr::filter(pith == earliest_year) %>%
+ # dplyr::pull(rodne_sid)
+    
+sitecoretable <- data.frame(table(valid_trees$site_name))
+
+# Collapse rows by 'year', summing up values for each tree (column) across rows with the same year
+collapsed_mastall <- mastall %>%
+  group_by(year) %>%
+  summarise(across(everything(), \(x) sum(x, na.rm = TRUE))) %>%
+  ungroup()
+
+# Filter collapsed_mastall data based on valid_trees
+filtered_mastall_data <- collapsed_mastall %>%
+  select(year, all_of(valid_trees))
+
+# Adjust increments
+for (i in seq_along(rogue_trees$rodne_sid)) {
+  tree_id <- rogue_trees$rodne_sid[i]
+  diam <- rogue_trees$diam_cm[i]
+  d2p <- rogue_trees$d2pith_cm[i]
+
+  col_index <- which(colnames(filtered_mastall_data) == tree_id)
+  if (length(col_index) > 0) {
+    scale_factor <- (diam / 2)
+    column_sum <- sum(filtered_mastall_data[, col_index])
+
+    if (column_sum != 0) {
+      filtered_mastall_data[, col_index] <- scale_factor * (filtered_mastall_data[, col_index] / column_sum)}}}
+
+# Summing Diameters
+filtered_df1 <- filtered_mastall_data %>% filter(year >= 1500 & year <= 1911)
+
+summed_values1 <- filtered_df1 %>% select(-year) %>% colSums()
+
+summed_increments <- data.frame(
+  rodne_sid = names(summed_values1),
+  diam_cm_1911 = summed_values1 * 2)
+
+# Merging data and correcting columns
+rogue_trees <- rogue_trees %>%
+  left_join(summed_increments, by = "rodne_sid") %>%
+  mutate(
+    live_in_1911 = ifelse(pred_pith <= 1911 & end_year >= 1911, "Yes", "No"),
+    live_in_1911 = factor(live_in_1911),
+    diam_cm_1911 = ifelse(live_in_1911 == "Yes", diam_cm_1911, diam_cm_1911),
+    age_in_1911 = ifelse((1911 - pred_pith) < 0, 0, 1911 - pred_pith),
+    
+    # Additional condition to check the absolute difference between pred_pith and pith
+    diam_cm_1911 = ifelse(abs(pred_pith - pith) >= 16, 0, diam_cm_1911))
+
+rogue_trees <- rogue_trees %>%
+  mutate(
+    diam_cm_1911 = ifelse(end_year <= 1911, diam_cm, diam_cm_1911))
+
+################################################################################
+# See the diam_cm_1911 values for the real cored trees
+rogue_diams_1911 <- rogue_trees %>%
+  filter(#corvallis_core == "YES",
+         #abs(pred_pith - pith) <= 15,
+         pred_pith < 1911,
+         diam_cm_1911 > 0)%>%
+  select("rodne_uid", "spcd", "pith", "pred_pith", "end_year", "live_in_1911", "diam_cm_1911", "diam_cm")
+rogue_diams_2011 <- rogue_trees %>%
+  filter(#corvallis_core == "YES",
+         #abs(pred_pith - pith) <= 15,
+         diam_cm > 0)%>%
+  select("rodne_uid", "spcd", "pith", "pred_pith", "end_year", "diam_cm_1911", "diam_cm")
+summary(rogue_diams_1911$diam_cm_1911)
+summary(rogue_diams_2011$diam_cm)
+
+# End of Diameter Generator from Cored Data
+```
+# Midpoint saved agedtrees.csv to reuse for creating the diameter knn
+
+```{r}
+write.csv(rogue_trees, "csv_output_deck/agedprediamtrees.csv", row.names = FALSE)
+```
+
+# F around and F out
+
+```{r}
+# Doing the mess around
+# ("rodne_nid", "diam_cm_1911", "rodne_site_ab", "spcd_mod", "biostrat", "diam_cm", "pred_pith", "tpi")
+# rmse = 9.777 & r2 = 0.707
+# ("rodne_nid", "diam_cm_1911", "spcd_mod", "biostrat", "diam_cm", "pred_pith", "tpi")
+# rmse = 9.735 & r2 = 0.711
+# ("rodne_nid", "diam_cm_1911", "spcd_mod", "diam_cm", "pred_pith", "tpi")
+# rmse = 9.745 & r2 = 0.710
+# ("rodne_nid", "diam_cm_1911", "spcd_mod", "diam_cm", "pred_pith", "tpi", "insol")
+# rmse = 9.745 & r2 = 0.710
+# ("rodne_nid", "diam_cm_1911", "spcd_mod", "diam_cm", "pred_pith")
+# rmse = 9.745 & r2 = 0.710
+# ("rodne_nid", "diam_cm_1911", "spcd_mod", "diam_cm", "pred_pith", "biostrat")
+# rmse = 9.737 & r2 = 0.711
+# ("rodne_nid", "diam_cm_1911", "rodne_site_ab", "spcd_mod", "diam_cm", "pred_pith", "biostrat")
+# rmse = 9.777 & r2 = 0.707
+```
+
+
+# 1911 diameter test and full kNN
+
+```{r}
+rogue_trees <- read.csv("csv_output_deck/agedprediamtrees.csv")
+
+# Creating the rogue and rogue_original dataframes for kNN
+rogue_original <- rogue_trees
+rogue <- rogue_trees
+
+# Select columns
+#cols_to_keep <- c("rodne_nid", "rodne_site_ab", "diam_cm", "capo_num", "pvt", "bps", "insol_value", "elevation", "spcd_mod", "tpa", "biostrat", "end_year", "geohash", "pred_pith", "age_in_1911")
+
+cols_to_keep <- c("rodne_nid", "diam_cm_1911", "spcd_mod", "diam_cm", "pred_pith", "biostrat")
+# RMSE = 6.703 & R2 = 0.9485
+
+rogue <- rogue %>%
+  select(all_of(cols_to_keep))
+
+# Fix Data Structure
+rogue <- rogue %>%
+  mutate(.,
+         #rodne_pid = as.numeric(as.factor(rodne_pid)),
+         #rodne_site_ab = as.numeric(factor(rodne_site_ab)),
+         #plot_size = as.numeric(plot_size),
+         #rodne_uid = as.numeric(factor(rodne_uid)),
+         #spcd = as.numeric(factor(spcd)),
+         diam_cm = as.numeric(diam_cm),
+         #capo_num = as.numeric(capo_num),
+         #pvt = as.numeric(as.factor(pvt)),
+         #tpi = as.numeric(as.factor(tpi)),
+         spcd_mod = as.numeric(as.factor(spcd_mod)),
+         #sdi_acre = as.numeric(sdi_acre),
+         #elevation = as.numeric(elevation),
+         biostrat = as.numeric(as.factor(biostrat)),
+         #plantassoc = as.numeric(as.factor(plantassoc)),
+         #geohash = as.numeric(as.factor(geohash)),
+         #bps = as.numeric(as.factor(bps)),
+         #deficit = as.numeric(deficit),
+         #tpa = as.numeric(tpa),
+         #end_year = as.numeric(end_year),
+         #basal_area_acre = as.numeric(basal_area_acre),
+         pred_pith = as.numeric(pred_pith),
+         #age_in_1911 = as.numeric(age_in_1911),
+         diam_cm_1911 = as.numeric(diam_cm_1911))
+
+# Separate the data into known and unknown diam_cm_1911
+rogue_known <- subset(rogue, !is.na(diam_cm_1911))
+rogue_unknown <- subset(rogue, is.na(diam_cm_1911))
+
+# Clean up the known data
+rogue_known <- rogue_known %>%
+  filter(pred_pith < 1911 & diam_cm_1911 > 0)
+
+# Remove the response variable from the unknown data
+rogue_unknown <- rogue_unknown[, !(names(rogue_unknown) %in% 'diam_cm_1911')]
+
+# Split the known data into training and test sets
+set.seed(12345)
+train_index <- createDataPartition(rogue_known$diam_cm_1911, p = 0.9, list = FALSE)
+train_data <- rogue_known[train_index, ]
+test_data <- rogue_known[-train_index, ]
+
+# Define RMSE function
+rmse <- function(actual, predicted) {
+  sqrt(mean((actual - predicted)^2))
+}
+
+# Response variable
+train_y <- train_data$diam_cm_1911
+test_y <- test_data$diam_cm_1911
+
+# Find the best k
+k_values <- 1:20
+rmse_values <- sapply(k_values, function(k) {
+  predictions <- knn(train = train_data[, -which(names(train_data) == 'diam_cm_1911')], 
+                      test = test_data[, -which(names(test_data) == 'diam_cm_1911')], 
+                      cl = train_y, k = k)
+  return(rmse(test_y, as.numeric(as.character(predictions))))
+})
+
+# Best k value
+best_diam_k <- k_values[order(rmse_values)[1]]
+
+# Plot the rmse values for each k value
+rmse_k <- data.frame(x = k_values, y = rmse_values)
+ggplot(rmse_k, aes(x = x, y = y)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Plotted RMSE values for each level of k",
+       x = "k value",
+       y = "RMSE value") +
+  theme_minimal()
+
+################################################################################
+################################################################################\
+# Test Run
+
+# Function to perform k-NN prediction on test_data
+knn_predict <- function(train_data, test_data, k) {
+  #predictors <- setdiff(names(train_data), "diam_cm_1911")
+  nn <- get.knnx(data = train_data[, c("spcd_mod", "biostrat", "diam_cm", "pred_pith")],
+                 query = test_data[, c("spcd_mod", "biostrat", "diam_cm", "pred_pith")],
+                 k = best_diam_k)
+  predicted_diam <- apply(nn$nn.index, 1, function(idx) {
+    mean(train_data$diam_cm_1911[idx])
+  })
+  return(predicted_diam)
+}
+
+# Perform bootstrap resampling and predictions
+n_bootstrap <- 1000
+bootstrap_predictions <- replicate(n_bootstrap, {
+  bootstrap_sample <- train_data[sample(nrow(train_data), replace = TRUE), ]
+  knn_predict(bootstrap_sample, test_data, k)
+})
+
+# Calculate the mean prediction and confidence intervals
+predicted_diam_mean <- apply(bootstrap_predictions, 1, mean)
+predicted_diam_lower <- apply(bootstrap_predictions, 1, function(x) quantile(x, 0.025))
+predicted_diam_upper <- apply(bootstrap_predictions, 1, function(x) quantile(x, 0.975))
+
+# Adding the generated mean prediction and 95% confidence intervals
+test_data <- test_data %>%
+  mutate(predicted_1911_diam = predicted_diam_mean,
+         ci_1911_diam_lower = predicted_diam_lower,
+         ci_1911_diam_upper = predicted_diam_upper)
+
+################################################################################
+
+# Plot actual vs. predicted with confidence intervals for test_data
+ggplot(test_data, aes(x = diam_cm_1911, y = predicted_1911_diam)) +
+  geom_point(aes(color = "Predicted"), alpha = 0.6) +
+  geom_errorbar(aes(ymin = ci_1911_diam_lower, ymax = ci_1911_diam_upper), width = 0.2, color = "blue", alpha = 0.4) +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(title = "Actual vs. Predicted diameter with Confidence Intervals",
+       x = "True diam",
+       y = "Predicted diam")
+
+# Finding error and R2
+error_trees <- test_data %>%
+  filter(diam_cm_1911>1) %>%
+  filter(predicted_1911_diam>1)
+
+# Mean Absolute Error (MAE)
+diam_test_mae <- mean(abs(error_trees$predicted_1911_diam - error_trees$diam_cm_1911))
+
+# Mean Squared Error (MSE)
+diam_test_mse <- mean((error_trees$predicted_1911_diam - error_trees$diam_cm_1911)^2)
+
+# Root Mean Squared Error (RMSE)
+diam_test_rmse <- sqrt(diam_test_mse)
+
+# Mean Absolute Percentdiam Error (MAPE)
+diam_test_mape <- mean(abs((error_trees$predicted_1911_diam - error_trees$diam_cm_1911) / error_trees$diam_cm_1911)) * 100
+
+# Get the R-squared value
+lm_model <- lm(predicted_1911_diam ~ diam_cm_1911, data = error_trees)
+diam_test_r2 <- summary(lm_model)$r.squared
+diam_test_r2
+
+################################################################################
+################################################################################
+# Rogue Run
+
+# Function to perform k-NN prediction on rogue
+knn_predict <- function(rogue_known, rogue, k) {
+  #predictors <- setdiff(names(rogue_known), "diam_cm_1911")
+  nn <- get.knnx(data = rogue_known[, c("spcd_mod", "biostrat", "diam_cm", "pred_pith")],
+                 query = rogue[, c("spcd_mod", "biostrat", "diam_cm", "pred_pith")],
+                 k = best_diam_k)
+  predicted_diam <- apply(nn$nn.index, 1, function(idx) {
+    mean(rogue_known$diam_cm_1911[idx])
+  })
+  return(predicted_diam)
+}
+
+# Perform bootstrap resampling and predictions
+n_bootstrap <- 1000
+bootstrap_predictions <- replicate(n_bootstrap, {
+  bootstrap_sample <- rogue_known[sample(nrow(rogue_known), replace = TRUE), ]
+  knn_predict(bootstrap_sample, rogue, k)
+})
+
+# Calculate the mean prediction and confidence intervals
+predicted_diam_mean <- apply(bootstrap_predictions, 1, mean)
+predicted_diam_lower <- apply(bootstrap_predictions, 1, function(x) quantile(x, 0.025))
+predicted_diam_upper <- apply(bootstrap_predictions, 1, function(x) quantile(x, 0.975))
+
+# Adding the generated mean prediction and 95% confidence intervals
+rogue <- rogue %>%
+  mutate(predicted_1911_diam = predicted_diam_mean,
+         ci_1911_diam_lower = predicted_diam_lower,
+         ci_1911_diam_upper = predicted_diam_upper)
+
+################################################################################
+
+# Plot actual vs. predicted with confidence intervals
+ggplot(rogue, aes(x = diam_cm_1911, y = predicted_1911_diam)) +
+  geom_point(aes(color = "Predicted"), alpha = 0.6) +
+  geom_errorbar(aes(ymin = ci_1911_diam_lower, ymax = ci_1911_diam_upper), width = 0.2, color = "blue", alpha = 0.4) +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(title = "Actual vs. Predicted diameters with Confidence Intervals",
+       x = "True diam",
+       y = "Predicted diam")
+
+# Finding error and R2
+error_trees <- rogue %>%
+  filter(diam_cm_1911>1) %>%
+  filter(predicted_1911_diam>1)
+
+# Mean Absolute Error (MAE)
+diam_rogue_mae <- mean(abs(error_trees$predicted_1911_diam - error_trees$diam_cm_1911))
+
+# Mean Squared Error (MSE)
+diam_rogue_mse <- mean((error_trees$predicted_1911_diam - error_trees$diam_cm_1911)^2)
+
+# Root Mean Squared Error (RMSE)
+diam_rogue_rmse <- sqrt(diam_rogue_mse)
+
+# Mean Absolute Percentdiam Error (MAPE)
+diam_rogue_mape <- mean(abs((error_trees$predicted_1911_diam - error_trees$diam_cm_1911) / error_trees$diam_cm_1911)) * 100
+
+# Get the R-squared value
+lm_model <- lm(predicted_1911_diam ~ diam_cm_1911, data = error_trees)
+diam_rogue_r2 <- summary(lm_model)$r.squared
+diam_rogue_r2
+
+################################################################################
+# Returning the model diam back to the original data and removing rodne_nid
+
+# Getting rid of the rest of the columns
+rogue <- rogue[c("rodne_nid", "ci_1911_diam_lower", "predicted_1911_diam", "ci_1911_diam_upper")]
+
+# Merging rogue to rogue_original 
+rogue_trees <- merge(rogue_original, rogue, by = "rodne_nid", all.x = TRUE)
+
+# Zero out the diameter prediction columns if a tree is not alive or existing in 1911
+rogue_trees[rogue_trees$age_in_1911 < 1 | rogue_trees$live_in_1911 == "No", c("predicted_1911_diam", "ci_1911_diam_lower", "ci_1911_diam_upper")] <- 0
+
+# Reviewing some of the data
+see_rogue <- rogue_trees[c("spcd", "rodne_pid", "pred_pith", "end_year", "ci_age_lower", "predicted_age", "ci_age_upper", "ci_1911_diam_lower", "predicted_1911_diam", "ci_1911_diam_upper", "diam_cm")]
+
+# See diam_cm_1911 along with each trees diam_cm, pred_pith, and end_year
+see_rogue1 <- rogue_trees[c("rodne_uid", "pred_pith", "end_year", "diam_cm_1911", "predicted_1911_diam", "diam_cm")]
+
+# End of kNN 1911 Diameter Model
+```
+
+# Midpoint save for after calculating the 1911 diameters
+
+```{r}
+write.csv(rogue_trees, "csv_output_deck/aged1911diamtrees.csv", row.names = FALSE)
+```
+
+# Getting the results ready for part 3 graphs and plots and diamagedtrees.csv 
+
+```{r}
+# Filtering out the result columns
+diamagedtrees <- rogue_trees[, c(
+  "rodne_uid", "end_year", "ci_age_lower", "predicted_age", "ci_age_upper", 
+  "pred_pith", "ci_1911_diam_lower", "predicted_1911_diam", "ci_1911_diam_upper")]
+
+# Tie the rest of the useful data back in from rogue_trees
+all_trees <- read.csv("csv_output_deck/agedprediamtrees.csv")
+all_trees <- all_trees[,c("site_name", "uid", "rodne_site_ab", "rodne_pid", "plot_type", 
+                          "plot_size", "rodne_sid", "rodne_uid", "trid", "stid", "multistem", 
+                          "rcdm", "conifer", "corvallis_core",
+                          "spcd", "spcd_mod", "diam_cm", "capo_num", "cond", "con_numeric", 
+                          "pith", "harvest_date", "plantassoc", "pvt", "bps", "insol", "insol_value", "tpi", "sdi_acre", "biostrat", "x", "y")]
+diamagedtrees <- left_join(all_trees, diamagedtrees, by = "rodne_uid")
+
+################################################################################
+# metric to imperial conversions
+diamagedtrees$diam_in_1911 <- diamagedtrees$predicted_1911_diam / 2.54
+diamagedtrees$diam_in_2011 <- diamagedtrees$diam_cm / 2.54
+
+# Basal area in square ft
+diamagedtrees$ba_1911_ft2 <- (diamagedtrees$diam_in_1911 ^ 2) * 0.00545415391
+diamagedtrees$ba_2011_ft2 <- (diamagedtrees$diam_in_2011 ^ 2) * 0.00545415391
+
+# Creating the include_1911 and 2011 columns to see how 
+# Create new columns with default value "NO"
+diamagedtrees$include_1911 <- "NO"
+diamagedtrees$include_2011 <- "NO"
+
+# Update columns based on conditions
+diamagedtrees$include_1911[diamagedtrees$pred_pith <= 1911 & diamagedtrees$end_year >= 1911] <- "YES"
+diamagedtrees$include_2011[diamagedtrees$pred_pith <= 2011 & diamagedtrees$end_year >= 2011] <- "YES"
+```
+
+# Write the diamagedtrees csv 
+
+```{r}
+write.csv(diamagedtrees, "csv_output_deck/diamagedtrees.csv", row.names = FALSE)
+# This is the stop for this part of the code but the next lines will prep the data for the next scripts (part 3)
+```
+
+# Go to hardwood resprouter (part 3)

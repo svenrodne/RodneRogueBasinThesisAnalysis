@@ -1,0 +1,71 @@
+---
+title: "kNN_part_3.5_diameter_correction"
+output: html_document
+date: "2025-07-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is used to find the average change in growth for the tree cores by species. The value of the average percent change will be used to correct the diameters for trees that were modeled to have a larger diameter in 1911 compared to the contemporary diameter.
+
+Clearing the runway
+
+```{r}
+# Clearing the runway
+rm(list=ls())
+```
+
+Finding the average percent change from the diam_cm for live trees differentiated by spcd_mod
+
+```{r}
+rogue_cores <- read.csv("csv_output_deck/agedprediamtrees.csv")
+
+average_growth <- rogue_cores %>%
+  filter(corvallis_core == "YES",
+         diam_cm_1911 > 0,
+         live_in_1911 == "Yes") %>%
+  group_by(spcd_mod) %>%
+  summarize(avg_ring_reduct = mean((diam_cm - diam_cm_1911)/diam_cm))
+```
+
+Now the trees with larger diameters in 1911 will be first cut from the trees_knn. Those records with the larger 1911 diameters will be corrected by the average percent change equation (diam_cm_1911 = diam_cm - (diam_cm * avg_ring_reduct)) and then added back to the final trees_knn file.
+
+```{r}
+# Adding the knn file
+all_trees <- read.csv("csv_output_deck/trees_knn.csv")
+
+# Separating the all_trees file into the correct_diams and wrong_diams files (selected by the records that have larger 1911 diams vs smaller 1911 diams compared to the contemporary diams)
+
+# Filter for trees with correct diameter trend (1911 diameter < current diameter)
+correct_diams <- all_trees %>%
+  filter(diam_in_1911 <= diam_in_2011)
+
+# Filter for trees with unexpected or reversed diameter trend (1911 diameter >= current diameter)
+wrong_diams <- all_trees %>%
+  filter(diam_in_1911 > diam_in_2011)
+
+# Join the avg_ring_reduct values to spcd_mod within wrong_diams
+corrected_diams <- left_join(wrong_diams, average_growth, by = "spcd_mod")
+
+# Use the avg_ring_reduct values to correct the diams
+corrected_diams <- corrected_diams %>%
+  mutate(diam_in_1911 = (diam_in_2011 - (diam_in_2011 * avg_ring_reduct)))
+
+# Check
+sum(corrected_diams$diam_in_1911 > corrected_diams$diam_in_2011, na.rm = TRUE)
+
+# Remove the extra column "avg_ring_reduct" from "corrected_diams"
+corrected_diams <- corrected_diams %>%
+  select(-"avg_ring_reduct")
+
+```
+
+Write the trees_knn file with the adjusted diameters
+
+```{r}
+# Combine "corrected_diams" with "correct_diams"
+trees_knn <- dplyr::bind_rows(correct_diams, corrected_diams)
+write.csv(trees_knn, "csv_output_deck/trees_knn.csv", row.names = FALSE)
+```

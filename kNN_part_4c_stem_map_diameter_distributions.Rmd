@@ -1,0 +1,680 @@
+---
+title: "kNN_part_3_stem_map_diameter_distributions"
+author: "Sven Rodne"
+date: "2024-07-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Ready the libraries
+
+```{r, warning=FALSE}
+# Libraries
+library(tidyverse)
+library(dplyr)
+library(gridExtra)
+library(ggspatial)
+library(ggplot2)
+library(grid)
+```
+
+```{r}
+# Data source
+rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+rogue_ages_dist <- rogue_ages %>%
+  filter(plot_type == "density") %>%
+  mutate(diam_cm_1911 = diam_in_1911 * 2.54,
+         diam_cm_2011 = diam_in_2011 * 2.54)
+rogue_stem_ages <- rogue_ages %>%
+  filter(plot_type=="stem" & diam_in_1911>10)
+test <- rogue_ages_dist %>%
+  filter(diam_cm_2011>=10)
+summary(test$diam_cm_2011)
+```
+
+For the diameter distributions of density plots
+
+```{r}
+rogue_density_plot_trees <- rogue_ages_dist %>%
+  filter(plot_type == "density") %>%
+  select(trid, rodne_uid, site_name, spcd, diam_cm_1911, diam_cm_2011, include_1911, include_2011, rodne_pid) %>%
+  pivot_longer(cols = c(diam_cm_1911, diam_cm_2011), names_to = "year", values_to = "diameter") %>%
+  mutate(
+    year = ifelse(year == "diam_cm_1911", 1911, 2011)) %>%
+  filter(diameter >= 10) %>%  # **Filter trees ≥ 10 cm**
+  filter(spcd %in% c("ARME", "PSME", "PIPO", "QUKE", "PILA", "ABCO", "CADE")) %>%  # Relevant species
+  mutate(
+    DBH_bin = factor(cut(diameter, 
+                         breaks = c(10, 30, 50, 80, 100, 180), 
+                         labels = c("10-30", "30-50", "50-80", "80-100", "100-180"),
+                         include.lowest = TRUE),
+                     levels = c("10-30", "30-50", "50-80", "80-100", "100-180"))  # Ensure correct bin order
+  ) %>%
+  group_by(site_name, year, spcd, DBH_bin, rodne_pid) %>% 
+  summarise(trees_per_ha = n() * 10) %>%  # Convert to trees per hectare
+  group_by(site_name, year, spcd, DBH_bin) %>%
+  summarise(avg_trees_per_ha = mean(trees_per_ha))  # Average across plots
+
+ggplot(rogue_density_plot_trees, aes(x = DBH_bin, y = avg_trees_per_ha, fill = spcd)) +
+  geom_bar(stat = "identity", position = "stack") +
+  facet_grid(year ~ site_name) +  # Split by year & site
+  scale_fill_manual(values = c(
+    "LIDE" = "#0072B2", "TABR" = "#F0E442", "UMCA" = "#E69F00",
+    "ABCO" = "#332288", "ABMAS" = "#88CCEE", "ACMA" = "#999933",
+    "ARME" = "#AA4499", "CADE" = "#CC6677", "CHCH" = "#44AA99",
+    "PILA" = "#882255", "PIPO" = "#DDCC77", "PSME" = "#6699cc",
+    "QUCH" = "#117733", "QUGA" = "#661100", "QUKE" = "#888888",
+    "CHLA" = "#56B4E9", "PIJE" = "#009E73"
+  )) +
+  theme_minimal(base_size = 20) +
+  theme(
+  axis.text.x = element_text(angle = 90, hjust = 1),
+  strip.text = element_text(size = 13, face = "bold"),  # Increase facet label text size
+  strip.text.x = element_text(margin = margin(t = 5, b = 5)),  # Add margin to prevent cutoff
+  strip.text.y = element_text(margin = margin(l = 5, r = 5))   # Adjust margin for y facet labels
+) +
+  labs(x = "DBH Range (cm)", y = "Average Trees per Hectare", fill = "Species") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# Save the plot
+ggsave("Graphics/rogue_density_diameter_distribution.png", plot = last_plot(), width = 20, height = 8, dpi = 300)
+
+```
+
+
+
+```{r}
+# Setting up the data
+###### rodne_pid AA ############################################
+#rodne_pid 1911 aa dataframe
+aa_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_in_1911>10 & include_1911=="YES")
+aa_rogue_ages_1911 <- aa_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(aa_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+aa_rogue_ages_1911 <- na.omit(aa_rogue_ages_1911)
+
+#rodne_pid 2011 aa dataframe
+aa_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_in_2011>10 & include_2011=="YES")
+aa_rogue_ages_2011 <- aa_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(aa_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+aa_rogue_ages_2011 <- na.omit(aa_rogue_ages_2011)
+
+combined_data_aa <- rbind(aa_rogue_ages_2011, aa_rogue_ages_1911)
+
+###### rodne_pid AB ############################################
+#rodne_pid 1911 ab dataframe
+ab_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_in_1911>10 & include_1911=="YES")
+ab_rogue_ages_1911 <- ab_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ab_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ab_rogue_ages_1911 <- na.omit(ab_rogue_ages_1911)
+
+#rodne_pid 2011 ab dataframe
+ab_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_in_2011>10 & include_2011=="YES")
+ab_rogue_ages_2011 <- ab_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ab_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ab_rogue_ages_2011 <- na.omit(ab_rogue_ages_2011)
+
+combined_data_ab <- rbind(ab_rogue_ages_2011, ab_rogue_ages_1911)
+
+###### rodne_pid AC ############################################
+#rodne_pid 1911 ac dataframe
+ac_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_in_1911>10 & include_1911=="YES")
+ac_rogue_ages_1911 <- ac_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ac_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ac_rogue_ages_1911 <- na.omit(ac_rogue_ages_1911)
+
+#rodne_pid 2011 ac dataframe
+ac_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_in_2011>10 & include_2011=="YES")
+ac_rogue_ages_2011 <- ac_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ac_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ac_rogue_ages_2011 <- na.omit(ac_rogue_ages_2011)
+
+combined_data_ac <- rbind(ac_rogue_ages_2011, ac_rogue_ages_1911)
+
+###### rodne_pid AD ############################################
+#rodne_pid 1911 ad dataframe
+ad_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_in_1911>10 & include_1911=="YES")
+ad_rogue_ages_1911 <- ad_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ad_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ad_rogue_ages_1911 <- na.omit(ad_rogue_ages_1911)
+
+#rodne_pid 2011 ad dataframe
+ad_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_in_2011>10 & include_2011=="YES")
+ad_rogue_ages_2011 <- ad_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ad_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ad_rogue_ages_2011 <- na.omit(ad_rogue_ages_2011)
+
+combined_data_ad <- rbind(ad_rogue_ages_2011, ad_rogue_ages_1911)
+
+###### rodne_pid BA ############################################
+#rodne_pid 1911 ba dataframe
+ba_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_in_1911>10 & include_1911=="YES")
+ba_rogue_ages_1911 <- ba_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ba_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ba_rogue_ages_1911 <- na.omit(ba_rogue_ages_1911)
+
+#rodne_pid 2011 ba dataframe
+ba_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_in_2011>10 & include_2011=="YES")
+ba_rogue_ages_2011 <- ba_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ba_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ba_rogue_ages_2011 <- na.omit(ba_rogue_ages_2011)
+
+combined_data_ba <- rbind(ba_rogue_ages_2011, ba_rogue_ages_1911)
+
+###### rodne_pid CA ############################################
+#rodne_pid 1911 ca dataframe
+ca_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_in_1911>10 & include_1911=="YES")
+ca_rogue_ages_1911 <- ca_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ca_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ca_rogue_ages_1911 <- na.omit(ca_rogue_ages_1911)
+
+#rodne_pid 2011 ca dataframe
+ca_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_in_2011>10 & include_2011=="YES")
+ca_rogue_ages_2011 <- ca_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ca_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ca_rogue_ages_2011 <- na.omit(ca_rogue_ages_2011)
+
+combined_data_ca <- rbind(ca_rogue_ages_2011, ca_rogue_ages_1911)
+
+###### rodne_pid MA ############################################
+#rodne_pid 1911 ma dataframe
+ma_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_in_1911>10 & include_1911=="YES")
+ma_rogue_ages_1911 <- ma_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ma_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ma_rogue_ages_1911 <- na.omit(ma_rogue_ages_1911)
+
+#rodne_pid 2011 ma dataframe
+ma_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_in_2011>10 & include_2011=="YES")
+ma_rogue_ages_2011 <- ma_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ma_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ma_rogue_ages_2011 <- na.omit(ma_rogue_ages_2011)
+
+combined_data_ma <- rbind(ma_rogue_ages_2011, ma_rogue_ages_1911)
+
+###### rodne_pid VA ############################################
+#rodne_pid 1911 va dataframe
+va_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_in_1911>10 & include_1911=="YES")
+va_rogue_ages_1911 <- va_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(va_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+va_rogue_ages_1911 <- na.omit(va_rogue_ages_1911)
+
+#rodne_pid 2011 va dataframe
+va_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_in_2011>10 & include_2011=="YES")
+va_rogue_ages_2011 <- va_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(va_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+va_rogue_ages_2011 <- na.omit(va_rogue_ages_2011)
+
+combined_data_va <- rbind(va_rogue_ages_2011, va_rogue_ages_1911)
+```
+
+```{r}
+# A brief look at the overall site diameter distributions
+combined_rogue_stem_data <- rbind(aa_rogue_ages_2011, aa_rogue_ages_1911, ab_rogue_ages_2011, ab_rogue_ages_1911, ac_rogue_ages_2011, ac_rogue_ages_1911, ad_rogue_ages_2011, ad_rogue_ages_1911, ba_rogue_ages_2011, ba_rogue_ages_1911, ca_rogue_ages_2011, ca_rogue_ages_1911, ma_rogue_ages_2011, ma_rogue_ages_1911, va_rogue_ages_2011, va_rogue_ages_1911)
+
+# Distributions
+# Overall diameter distributions for 1911 and 2011
+ggplot(combined_rogue_stem_data, aes(y = dbh, x = year)) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution in 1911 and 2011",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_blank())
+```
+
+# AA Diameter Distributions
+
+```{r}
+# Calculating the counts
+counts <- combined_data_aa %>%
+  group_by(spcd, year) %>%
+  summarize(n = n())
+
+# Merge back with the combined data
+combined_data_aa <- combined_data_aa %>%
+  left_join(counts, by = c("spcd", "year"))
+
+# Plotting the diameter distributions for each species in 1911 and 2011
+ggplot(combined_data_aa, aes(x = spcd, y = dbh, fill = factor(year))) +
+  geom_boxplot() +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution per Species in 1911 and 2011",
+       x = "Species",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  geom_text(data = counts, aes(x = spcd, y = min(combined_data_ma$dbh) - 3, label = paste("n=", n, sep = " "), angle = 45), 
+            position = position_dodge(width = 0.75), vjust = -0.5, size = 3)
+
+# Overall diameter distributions for 1911 and 2011
+ggplot(combined_data_aa, aes(y = dbh, x = year)) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution in 1911 and 2011",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_blank())
+
+# Two sample t-test between the diameters
+t.test(aa_rogue_ages_1911$dbh, aa_rogue_ages_2011$dbh)
+```
+
+# AB Diameter Distributions
+
+```{r}
+# Calculating the counts
+counts <- combined_data_ab %>%
+  group_by(spcd, year) %>%
+  summarize(n = n())
+
+# Merge back with the combined data
+combined_data_ab <- combined_data_ab %>%
+  left_join(counts, by = c("spcd", "year"))
+
+# Plotting the diameter distributions for each species in 1911 and 2011
+ggplot(combined_data_ab, aes(x = spcd, y = dbh, fill = factor(year))) +
+  geom_boxplot() +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution per Species in 1911 and 2011",
+       x = "Species",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  geom_text(data = counts, aes(x = spcd, y = min(combined_data_ma$dbh) - 3, label = paste("n=", n, sep = " "), angle = 45), 
+            position = position_dodge(width = 0.75), vjust = -0.5, size = 3)
+
+# Overall diameter distributions for 1911 and 2011
+ggplot(combined_data_ab, aes(y = dbh, x = factor(year))) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution in 1911 and 2011",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_blank())
+
+# Two sample t-test between the diameters
+t.test(ab_rogue_ages_1911$dbh, ab_rogue_ages_2011$dbh)
+```
+
+# AC Diameter Distributions
+
+```{r}
+# Calculating the counts
+counts <- combined_data_ac %>%
+  group_by(spcd, year) %>%
+  summarize(n = n())
+
+# Merge back with the combined data
+combined_data_ac <- combined_data_ac %>%
+  left_join(counts, by = c("spcd", "year"))
+
+# Plotting the diameter distributions for each species in 1911 and 2011
+ggplot(combined_data_ac, aes(x = spcd, y = dbh, fill = factor(year))) +
+  geom_boxplot() +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution per Species in 1911 and 2011",
+       x = "Species",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  geom_text(data = counts, aes(x = spcd, y = min(combined_data_ma$dbh) - 3, label = paste("n=", n, sep = " "), angle = 45), 
+            position = position_dodge(width = 0.75), vjust = -0.5, size = 3)
+
+# Overall diameter distributions for 1911 and 2011
+ggplot(combined_data_ac, aes(y = dbh, x = year)) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution in 1911 and 2011",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_blank())
+
+# Two sample t-test between the diameters
+t.test(ac_rogue_ages_1911$dbh, ac_rogue_ages_2011$dbh)
+```
+
+# AD Diameter Distributions
+
+```{r}
+# Calculating the counts
+counts <- combined_data_ad %>%
+  group_by(spcd, year) %>%
+  summarize(n = n())
+
+# Merge back with the combined data
+combined_data_ad <- combined_data_ad %>%
+  left_join(counts, by = c("spcd", "year"))
+
+# Plotting the diameter distributions for each species in 1911 and 2011
+ggplot(combined_data_ad, aes(x = spcd, y = dbh, fill = factor(year))) +
+  geom_boxplot() +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution per Species in 1911 and 2011",
+       x = "Species",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  geom_text(data = counts, aes(x = spcd, y = min(combined_data_ma$dbh) - 3, label = paste("n=", n, sep = " "), angle = 45), 
+            position = position_dodge(width = 0.75), vjust = -0.5, size = 3)
+
+# Overall diameter distributions for 1911 and 2011
+ggplot(combined_data_ad, aes(y = dbh, x = year)) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution in 1911 and 2011",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_blank())
+
+# Two sample t-test between the diameters
+t.test(ad_rogue_ages_1911$dbh, ad_rogue_ages_2011$dbh)
+```
+
+# BA Diameter Distributions
+
+```{r}
+# Calculating the counts
+counts <- combined_data_ba %>%
+  group_by(spcd, year) %>%
+  summarize(n = n())
+
+# Merge back with the combined data
+combined_data_ba <- combined_data_ba %>%
+  left_join(counts, by = c("spcd", "year"))
+
+# Plotting the diameter distributions for each species in 1911 and 2011
+ggplot(combined_data_ba, aes(x = spcd, y = dbh, fill = factor(year))) +
+  geom_boxplot() +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution per Species in 1911 and 2011",
+       x = "Species",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  geom_text(data = counts, aes(x = spcd, y = min(combined_data_ma$dbh) - 3, label = paste("n=", n, sep = " "), angle = 45), 
+            position = position_dodge(width = 0.75), vjust = -0.5, size = 3)
+
+# Overall diameter distributions for 1911 and 2011
+ggplot(combined_data_ba, aes(y = dbh, x = year)) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution in 1911 and 2011",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_blank())
+
+# Two sample t-test between the diameters
+t.test(ba_rogue_ages_1911$dbh, ba_rogue_ages_2011$dbh)
+```
+
+# CA Diameter Distributions
+
+```{r}
+# Calculating the counts
+counts <- combined_data_ca %>%
+  group_by(spcd, year) %>%
+  summarize(n = n())
+
+# Merge back with the combined data
+combined_data_ca <- combined_data_ca %>%
+  left_join(counts, by = c("spcd", "year"))
+
+# Plotting the diameter distributions for each species in 1911 and 2011
+ggplot(combined_data_ca, aes(x = spcd, y = dbh, fill = factor(year))) +
+  geom_boxplot() +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution per Species in 1911 and 2011",
+       x = "Species",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  geom_text(data = counts, aes(x = spcd, y = min(combined_data_ma$dbh) - 3, label = paste("n=", n, sep = " "), angle = 45), 
+            position = position_dodge(width = 0.75), vjust = -0.5, size = 3)
+
+# Overall diameter distributions for 1911 and 2011
+ggplot(combined_data_ca, aes(y = dbh, x = year)) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution in 1911 and 2011",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_blank())
+
+# Two sample t-test between the diameters
+t.test(ca_rogue_ages_1911$dbh, ca_rogue_ages_2011$dbh)
+```
+
+# MA Diameter Distributions
+
+```{r}
+# Calculating the counts
+counts <- combined_data_ma %>%
+  group_by(spcd, year) %>%
+  summarize(n = n())
+
+# Merge back with the combined data
+combined_data_ma <- combined_data_ma %>%
+  left_join(counts, by = c("spcd", "year"))
+
+# Plotting the diameter distributions for each species in 1911 and 2011
+ggplot(combined_data_ma, aes(x = spcd, y = dbh, fill = factor(year))) +
+  geom_boxplot() +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution per Species in 1911 and 2011",
+       x = "Species",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  geom_text(data = counts, aes(x = spcd, y = min(combined_data_ma$dbh) - 3, label = paste("n=", n, sep = " "), angle = 45), 
+            position = position_dodge(width = 0.75), vjust = -0.5, size = 3)
+
+# Overall diameter distributions for 1911 and 2011
+ggplot(combined_data_ma, aes(y = dbh, x = year)) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution in 1911 and 2011",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_blank())
+
+# Two sample t-test between the diameters
+t.test(ma_rogue_ages_1911$dbh, ma_rogue_ages_2011$dbh)
+```
+
+# VA Diameter Distributions
+
+```{r}
+# Calculating the counts
+counts <- combined_data_va %>%
+  group_by(spcd, year) %>%
+  summarize(n = n())
+
+# Merge back with the combined data
+combined_data_va <- combined_data_va %>%
+  left_join(counts, by = c("spcd", "year"))
+
+# Plotting the diameter distributions for each species in 1911 and 2011
+ggplot(combined_data_va, aes(x = spcd, y = dbh, fill = factor(year))) +
+  geom_boxplot() +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution per Species in 1911 and 2011",
+       x = "Species",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  geom_text(data = counts, aes(x = spcd, y = min(combined_data_ma$dbh) - 3, label = paste("n=", n, sep = " "), angle = 45), 
+            position = position_dodge(width = 0.75), vjust = -0.5, size = 3)
+
+# Overall diameter distributions for 1911 and 2011
+ggplot(combined_data_va, aes(y = dbh, x = year)) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution in 1911 and 2011",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_blank())
+
+# Two sample t-test between the diameters
+t.test(va_rogue_ages_1911$dbh, va_rogue_ages_2011$dbh)
+```

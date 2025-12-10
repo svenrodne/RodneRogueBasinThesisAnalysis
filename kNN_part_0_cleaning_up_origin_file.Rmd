@@ -1,0 +1,394 @@
+---
+title: "kNN_part_0_cleaning_up_origin_file"
+author: "Sven Rodne"
+date: "2025-12-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Clear the environment if needed
+
+```{r}
+rm(list=ls())
+```
+
+Load in the required packages
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(mgcv)
+```
+
+Clean up the origin file and give full rows to all the tallied trees
+
+```{r}
+# Pulling original data copy to copy the new rows of trees based on tally values from the tally, x0_5_cm, or x5_10_cm columns
+
+original_data <- read.csv("data_origin/rogue_basin_data_11_21_2023.csv")
+
+# Convert NA tally values to 1
+original_data <- original_data %>%
+  mutate(tally = ifelse(is.na(tally), 1, tally))
+
+################################################################################
+
+# Filtering out the records without diam_cm but with dstmp
+dstmp <- original_data %>%
+  filter(is.na(diam_cm) & dstmp>0)
+
+# Take the inverse of the dstmp dataframe for joining after calculating the diam_cm from dstmp
+inverse_dstmp <- anti_join(original_data, dstmp, by = "rodne_uid")
+
+################################################################################
+
+# Generalized Additive Model for the regression equation to calculate diam_cm from dstmp
+
+gammod1 <- gam(diam_cm ~ dstmp, data = inverse_dstmp)
+summary(gammod1)$r.sq
+summary(gammod1)
+
+# Calculate diam_cm for the trees with only dstmp
+
+dstmp <- dstmp %>%
+  mutate(diam_cm = (dstmp*0.906580)-2.149607)
+
+# Join dstmp and inverse_dstmp back into the original_data
+
+original_data <- bind_rows(dstmp, inverse_dstmp)
+
+################################################################################
+
+# Add the coordinate information for all trees by first splitting the data into either stem and density
+
+rogue_density_data <- original_data %>%
+  filter(plot_type=="density")
+
+rogue_stem_data <- original_data %>%
+  filter(plot_type=="stem")
+
+# Stem spatial data
+
+stem_spatial <- read.csv("csv_input_deck/stem_map_spatial_data.csv")
+stem_spatial <- stem_spatial[,c("uid", "X", "Y")]
+colnames(stem_spatial) <- c("uid", "x", "y")
+rogue_stem_data <- merge(rogue_stem_data, stem_spatial, by = "uid", all.x = TRUE)
+subsetroguestem <- rogue_stem_data[,c("uid", "x", "y")]
+
+# Density spatial data
+
+density_spatial <- read.csv("csv_input_deck/densityplotcoords.csv")
+density_spatial <- density_spatial[,c("Rodne_PID", "POINT_X", "POINT_Y")]
+colnames(density_spatial) <- c("rodne_pid", "x", "y")
+density_spatial <- unique(density_spatial)
+rogue_density_data <- merge(rogue_density_data, density_spatial, by = "rodne_pid", all.x = TRUE)
+subsetroguedensity <- rogue_density_data[,c("iid", "x", "y")]
+
+# Bind all spatial data together
+
+all_rogue <- bind_rows(rogue_stem_data, rogue_density_data)
+
+# Prepare the data for the next part
+
+original_df <- all_rogue
+
+################################################################################
+
+# For tally and diam_cm only
+
+# Initialize an empty list to store duplicated rows
+
+duplicated_rows <- list()
+
+# Loop through each row of the original dataframe
+
+for (i in 1:nrow(original_df)) {
+  row <- original_df[i, ]
+  
+  # If tally has a number greater than 1, duplicate the row based on the value in tally
+  if (!is.na(row$tally) && row$tally > 1) {
+    for (j in 1:row$tally) {
+      # Duplicate the row
+      duplicated_row <- row
+      
+      # Increment uid and rodne_uid from "001" onwards
+      duplicated_row$uid <- paste0(duplicated_row$uid, "_", sprintf("%03d", j))
+      duplicated_row$rodne_uid <- paste0(duplicated_row$rodne_uid, "_", sprintf("%03d", j))
+      
+      # Append the duplicated row to the list
+      duplicated_rows[[length(duplicated_rows) + 1]] <- duplicated_row
+    }
+  }
+}
+
+# Combine the duplicated rows into a dataframe
+tallied_df <- do.call(rbind, duplicated_rows)
+
+# Reset row names
+rownames(tallied_df) <- NULL
+
+# This results in the tallied_df
+
+################################################################################
+
+# For X0_5_cm
+
+# Initialize an empty list to store duplicated rows
+
+duplicated_rows <- list()
+
+# Loop through each row of the original dataframe
+
+for (i in 1:nrow(original_df)) {
+  row <- original_df[i, ]
+  
+  # Print the value of X0_5_cm for debugging
+  print(row$X0_5_cm)
+  
+  # If X0_5_cm has a number greater than 1, duplicate the row based on the value in X0_5_cm
+  if (!is.na(row$X0_5_cm) && row$X0_5_cm > 1) {
+    for (j in 1:row$X0_5_cm) {
+      # Duplicate the row
+      duplicated_row <- row
+      
+      # Increment uid and rodne_uid from "001" onwards
+      duplicated_row$uid <- paste0(duplicated_row$uid, "_", sprintf("%03d", j))
+      duplicated_row$rodne_uid <- paste0(duplicated_row$rodne_uid, "_", sprintf("%03d", j))
+      
+      # Set diam_cm to 2.5 for the duplicated row
+      duplicated_row$diam_cm <- 2.5
+      
+      # Append the duplicated row to the list
+      duplicated_rows[[length(duplicated_rows) + 1]] <- duplicated_row
+    }
+  }
+  
+  # If X0_5_cm has a value of 1, set diam_cm to 2.5
+  if (!is.na(row$X0_5_cm) && row$X0_5_cm == 1) {
+    duplicated_row <- row
+    duplicated_row$diam_cm <- 2.5
+    duplicated_rows[[length(duplicated_rows) + 1]] <- duplicated_row
+  }
+}
+
+# Combine the duplicated rows into a dataframe
+
+X0_5_cm_df <- do.call(rbind, duplicated_rows)
+
+# Reset row names
+
+rownames(X0_5_cm_df) <- NULL
+
+################################################################################
+
+# For X5_10_cm
+
+# Initialize an empty list to store duplicated rows
+
+duplicated_rows <- list()
+
+# Loop through each row of the original dataframe
+for (i in 1:nrow(original_df)) {
+  row <- original_df[i, ]
+  
+  # If X5_10_cm has a number greater than 1, duplicate the row based on the value in X5_10_cm
+  if (!is.na(row$X5_10_cm) && row$X5_10_cm > 1) {
+    for (j in 1:row$X5_10_cm) {
+      # Duplicate the row
+      duplicated_row <- row
+      
+      # Increment uid and rodne_uid from "001" onwards
+      duplicated_row$uid <- paste0(duplicated_row$uid, "_", sprintf("%03d", j))
+      duplicated_row$rodne_uid <- paste0(duplicated_row$rodne_uid, "_", sprintf("%03d", j))
+      
+      # Set diam_cm to 7.5 for the duplicated row
+      duplicated_row$diam_cm <- 7.5
+      
+      # Append the duplicated row to the list
+      duplicated_rows[[length(duplicated_rows) + 1]] <- duplicated_row
+    }
+  }
+  
+  # If X5_10_cm has a value of 1, set diam_cm to 7.5
+  if (!is.na(row$X5_10_cm) && row$X5_10_cm == 1) {
+    duplicated_row <- row
+    duplicated_row$diam_cm <- 7.5
+    duplicated_rows[[length(duplicated_rows) + 1]] <- duplicated_row
+  }
+}
+
+# Combine the duplicated rows into a dataframe
+
+X5_10_cm_df <- do.call(rbind, duplicated_rows)
+
+# Reset row names
+
+rownames(X5_10_cm_df) <- NULL
+
+################################################################################
+
+# Bind the rows of the three data frames x0_5_cm_df, x5_10_cm_df, and tallied_df
+
+tallied_all_df <- rbind(X0_5_cm_df, X5_10_cm_df, tallied_df)
+
+# Reset row names
+
+rownames(tallied_all_df) <- NULL
+
+################################################################################
+
+# Now we need to replace the id value rows within original_df with the ones that are in tallied_all_df
+
+# Remove original rows with the same unique id values as tallied_all_df
+
+original_df <- original_df[!original_df$id %in% tallied_all_df$id, ]
+
+# Append all rows from tallied_all_df to original_df
+
+original_df <- rbind(original_df, tallied_all_df)
+
+# Reset row names
+
+rownames(original_df) <- NULL
+
+################################################################################
+
+# Correct the canopy positions for the origin data
+
+original_df <- original_df %>%
+  group_by(pcid, trid) %>%
+  mutate(capo_num = ifelse(is.na(capo_num), min(capo_num, na.rm = TRUE), capo_num)) %>%
+  ungroup()
+
+################################################################################
+
+# Correcting the plethora of canopy level names to standardized names
+
+# Mapping the proper names
+
+mapping <- c("Codominant" = "codominant",
+             "CODOMINANT" = "codominant",
+             "DEAD" = "dead",
+             "Dominant" = "dominant",
+             "DOMINANT" = "dominant",
+             "Intermediate" = "intermediate",
+             "INTERMEDIATE" = "intermediate",
+             "Open Grown" = "dominant",
+             "OPEN GROWN" = "dominant",
+             "Suppressed" = "suppressed",
+             "SUPPRESSED" = "suppressed",
+             "Supressed" = "suppressed")
+
+# Apply the mapping to the "capo" column
+
+original_df <- original_df %>%
+  mutate(capo = case_when(
+    capo %in% names(mapping) ~ mapping[as.character(capo)],
+    TRUE ~ as.character(capo)
+  ))
+
+table(original_df$capo)
+################################################################################
+
+# Change the capo descriptions so that they match the capo_num value
+original_df <- original_df %>%
+  mutate(capo = case_when(
+    capo_num == 1 ~ "dominant",
+    capo_num == 2 ~ "codominant",
+    capo_num == 3 ~ "intermediate",
+    capo_num == 4 ~ "suppressed",
+    capo_num == 0 ~ "dead",
+    TRUE ~ as.character(capo)  # Keep the original value if none of the other defined conditions match
+  ))
+
+table(original_df$capo)
+
+################################################################################
+# View column names
+colnames(original_df)
+
+# Clean up column names
+original_df <- original_df %>%
+  dplyr::rename(insol = Insolation,
+         tpi = TPI,
+         pvt = imap_name)
+
+# Clean up the tpi rows
+original_df$tpi[original_df$tpi == "MidSlope"] <- "Midslope"
+original_df$tpi[original_df$tpi == "Midslope"] <- "Mid Slope"
+original_df$tpi[original_df$tpi == "Ridge"] <- "Ridge Top"
+table(original_df$tpi)
+
+# Get rid of the columns that are not needed
+original_df <- original_df %>%
+  select(id, site_name, rodne_site_ab, uid, rodne_uid, rodne_pid, plot_type, plot_size, 
+         pcid, trid, stid, spcd, multistem, tally, diam_cm, dstmp, X5_10_cm, X0_5_cm, 
+         no_diam, rcdm, indm, cond, corvallis_core, rodne_sid, outer_ring, inner_ring, pith, d2pith_mm,
+         metlen_age, conifer, con_numeric, capo, capo_num, harvest_date, canopy_cov, tpi, x, y)
+
+################################################################################
+# Change the value of capo_num to 4 where capo_num is 0 and cond is LIVE
+original_df$capo_num[original_df$capo_num == 0 & original_df$cond == "LIVE"] <- 4
+
+################################################################################
+# Convert the d2pith_mm to cm
+original_df$d2pith_mm <- as.numeric(original_df$d2pith_mm)
+original_df$d2pith_cm <- original_df$d2pith_mm / 10
+
+################################################################################
+# Filter out the tree records that does not have any records of bole/root crown diameter
+no_diam <- original_df %>%
+  filter(is.na(diam_cm) & is.na(dstmp) & is.na(X5_10_cm) & is.na(X0_5_cm) & is.na(rcdm))
+
+# Take the inverse of the no_diam dataframe for the final original_df that has some form of diameter measurement (RCDM)
+original_df <- anti_join(original_df, no_diam, by = "rodne_uid")
+
+################################################################################
+# Now I can attempt to calculate diam_cm from rcdm for only the single stem trees
+# Need to calculate the regression for diam_cm <- rcdm for single stemmed hardwood individuals
+regr_hardwood <- original_df %>%
+  filter(conifer=="Hardwood" & multistem==0 & tally==1)
+
+# Generalized Additive Model for the regression equation to calculate diam_cm from rcdm
+gammod1 <- gam(diam_cm ~ rcdm, data = regr_hardwood)
+summary(gammod1)$r.sq
+summary(gammod1)
+
+# Create single_stemmed dataframe that will be calculated for diam_cm from rcdm
+multi_stemmed <- original_df %>%
+  filter(is.na(diam_cm) & rcdm>0) %>%
+  mutate(diam_cm = ((rcdm*0.37254)+6.597175)/tally)
+
+# Take the inverse of multi_stemmed to add back to original_df
+non_multi <- anti_join(original_df, multi_stemmed, by = "rodne_uid")
+
+# Join multi_stemmed and non_multi back into the original_df
+original_df <- bind_rows(multi_stemmed, non_multi)
+
+################################################################################
+# Whenever tally is greater than 1, multistem is equal to 1
+original_df <- original_df %>%
+  mutate(multistem = ifelse(tally > 1, 1, multistem))
+
+################################################################################
+# Viewing the data to ensure that *most* trees have canopy positions and diameters.
+subset_data <- original_df[,c("id", "uid", "pcid", "trid", "stid", "multistem", "spcd", "capo_num", "tally", "diam_cm", "dstmp", "X0_5_cm", "X5_10_cm", "no_diam", "conifer", "rcdm", "indm")]
+
+hardwood_subset_data <- subset_data %>%
+  filter(multistem=="1") %>%
+  filter(conifer=="Hardwood")
+
+conifer_subset_data <- subset_data %>%
+  filter(conifer=="Conifer")
+
+################################################################################
+# Write the dataframe to a CSV file
+write.csv(original_df, "data_origin/cleaned_rogue_basin_data_2024.csv", row.names = FALSE)
+original_df <- read.csv("data_origin/cleaned_rogue_basin_data_2024.csv")
+
+
+```
+

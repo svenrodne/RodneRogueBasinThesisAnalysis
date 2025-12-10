@@ -1,0 +1,1074 @@
+---
+title: "kNN_part_3_stem_map_spatial_plots"
+author: "Sven Rodne"
+date: "2024-07-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Clear the runway
+rm(list=ls())
+```
+
+# Ready the libraries
+
+```{r, warning=FALSE}
+# Libraries
+library(tidyverse)
+library(dplyr)
+library(gridExtra)
+library(ggspatial)
+library(ggplot2)
+library(grid)
+library(classInt)
+```
+
+
+```{r}
+# Data source
+rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+rogue_ages <- rogue_ages %>%
+  mutate(diam_cm_1911 = diam_in_1911 * 2.54,
+         diam_cm_2011 = diam_in_2011 * 2.54)
+rogue_stem_ages <- rogue_ages %>%
+  filter(plot_type=="stem" & diam_in_1911>=10)
+summary(rogue_stem_ages$diam_cm_2011)
+#rogue_ages <- read.csv("csv_output_deck/trees_expdec.csv")
+#rogue_ages <- read.csv("csv_output_deck/trees_linear.csv")
+```
+
+Standard
+
+```{r}
+# Setting up the data
+# Adding in the disinct code to focus on just trees
+###### rodne_pid AA ############################################
+#rodne_pid 1911 aa dataframe
+aa_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_in_1911>=10 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+aa_rogue_ages_1911 <- aa_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(aa_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+aa_rogue_ages_1911 <- na.omit(aa_rogue_ages_1911)
+
+#rodne_pid 2011 aa dataframe
+aa_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_in_2011>=10 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+aa_rogue_ages_2011 <- aa_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(aa_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+aa_rogue_ages_2011 <- na.omit(aa_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_aa <- rbind(aa_rogue_ages_1911, aa_rogue_ages_2011)
+
+###### rodne_pid AB ############################################
+#rodne_pid 1911 ab dataframe
+ab_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_in_1911>=10 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ab_rogue_ages_1911 <- ab_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ab_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ab_rogue_ages_1911 <- na.omit(ab_rogue_ages_1911)
+
+#rodne_pid 2011 ab dataframe
+ab_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_in_2011>=10 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ab_rogue_ages_2011 <- ab_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ab_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ab_rogue_ages_2011 <- na.omit(ab_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ab <- rbind(ab_rogue_ages_1911, ab_rogue_ages_2011)
+
+###### rodne_pid AC ############################################
+#rodne_pid 1911 ac dataframe
+ac_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_in_1911>=10 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ac_rogue_ages_1911 <- ac_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ac_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ac_rogue_ages_1911 <- na.omit(ac_rogue_ages_1911)
+
+#rodne_pid 2011 ac dataframe
+ac_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_in_2011>=10 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ac_rogue_ages_2011 <- ac_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ac_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ac_rogue_ages_2011 <- na.omit(ac_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ac <- rbind(ac_rogue_ages_1911, ac_rogue_ages_2011)
+
+###### rodne_pid AD ############################################
+#rodne_pid 1911 ad dataframe
+ad_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_in_1911>=10 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ad_rogue_ages_1911 <- ad_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ad_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ad_rogue_ages_1911 <- na.omit(ad_rogue_ages_1911)
+
+#rodne_pid 2011 ad dataframe
+ad_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_in_2011>=10 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ad_rogue_ages_2011 <- ad_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ad_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ad_rogue_ages_2011 <- na.omit(ad_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ad <- rbind(ad_rogue_ages_1911, ad_rogue_ages_2011)
+
+###### rodne_pid BA ############################################
+#rodne_pid 1911 ba dataframe
+ba_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_in_1911>=10 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ba_rogue_ages_1911 <- ba_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ba_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ba_rogue_ages_1911 <- na.omit(ba_rogue_ages_1911)
+
+#rodne_pid 2011 ba dataframe
+ba_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_in_2011>=10 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ba_rogue_ages_2011 <- ba_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ba_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ba_rogue_ages_2011 <- na.omit(ba_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ba <- rbind(ba_rogue_ages_1911, ba_rogue_ages_2011)
+
+###### rodne_pid CA ############################################
+#rodne_pid 1911 ca dataframe
+ca_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_in_1911>=10 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ca_rogue_ages_1911 <- ca_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ca_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ca_rogue_ages_1911 <- na.omit(ca_rogue_ages_1911)
+
+#rodne_pid 2011 ca dataframe
+ca_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_in_2011>=10 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ca_rogue_ages_2011 <- ca_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ca_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ca_rogue_ages_2011 <- na.omit(ca_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ca <- rbind(ca_rogue_ages_1911, ca_rogue_ages_2011)
+
+###### rodne_pid MA ############################################
+#rodne_pid 1911 ma dataframe
+ma_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_in_1911>=10 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ma_rogue_ages_1911 <- ma_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ma_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ma_rogue_ages_1911 <- na.omit(ma_rogue_ages_1911)
+
+#rodne_pid 2011 ma dataframe
+ma_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_in_2011>=10 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ma_rogue_ages_2011 <- ma_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ma_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ma_rogue_ages_2011 <- na.omit(ma_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ma <- rbind(ma_rogue_ages_1911, ma_rogue_ages_2011)
+
+###### rodne_pid VA ############################################
+#rodne_pid 1911 va dataframe
+va_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_in_1911>=10 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+va_rogue_ages_1911 <- va_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(va_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+va_rogue_ages_1911 <- na.omit(va_rogue_ages_1911)
+
+#rodne_pid 2011 va dataframe
+va_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_in_2011>=10 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+va_rogue_ages_2011 <- va_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(va_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+va_rogue_ages_2011 <- na.omit(va_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_va <- rbind(va_rogue_ages_1911, va_rogue_ages_2011)
+```
+
+Metric
+
+```{r}
+# Setting up the data
+# Adding in the disinct code to focus on just trees
+###### rodne_pid AA ############################################
+#rodne_pid 1911 aa dataframe
+aa_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+aa_rogue_ages_1911 <- aa_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(aa_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+aa_rogue_ages_1911 <- na.omit(aa_rogue_ages_1911)
+
+#rodne_pid 2011 aa dataframe
+aa_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+aa_rogue_ages_2011 <- aa_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(aa_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+aa_rogue_ages_2011 <- na.omit(aa_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_aa <- rbind(aa_rogue_ages_1911, aa_rogue_ages_2011)
+
+###### rodne_pid AB ############################################
+#rodne_pid 1911 ab dataframe
+ab_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ab_rogue_ages_1911 <- ab_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ab_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ab_rogue_ages_1911 <- na.omit(ab_rogue_ages_1911)
+
+#rodne_pid 2011 ab dataframe
+ab_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ab_rogue_ages_2011 <- ab_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ab_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ab_rogue_ages_2011 <- na.omit(ab_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ab <- rbind(ab_rogue_ages_1911, ab_rogue_ages_2011)
+
+###### rodne_pid AC ############################################
+#rodne_pid 1911 ac dataframe
+ac_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ac_rogue_ages_1911 <- ac_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ac_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ac_rogue_ages_1911 <- na.omit(ac_rogue_ages_1911)
+
+#rodne_pid 2011 ac dataframe
+ac_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ac_rogue_ages_2011 <- ac_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ac_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ac_rogue_ages_2011 <- na.omit(ac_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ac <- rbind(ac_rogue_ages_1911, ac_rogue_ages_2011)
+
+###### rodne_pid AD ############################################
+#rodne_pid 1911 ad dataframe
+ad_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ad_rogue_ages_1911 <- ad_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ad_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ad_rogue_ages_1911 <- na.omit(ad_rogue_ages_1911)
+
+#rodne_pid 2011 ad dataframe
+ad_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ad_rogue_ages_2011 <- ad_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ad_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ad_rogue_ages_2011 <- na.omit(ad_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ad <- rbind(ad_rogue_ages_1911, ad_rogue_ages_2011)
+
+###### rodne_pid BA ############################################
+#rodne_pid 1911 ba dataframe
+ba_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ba_rogue_ages_1911 <- ba_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ba_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ba_rogue_ages_1911 <- na.omit(ba_rogue_ages_1911)
+
+#rodne_pid 2011 ba dataframe
+ba_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ba_rogue_ages_2011 <- ba_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ba_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ba_rogue_ages_2011 <- na.omit(ba_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ba <- rbind(ba_rogue_ages_1911, ba_rogue_ages_2011)
+
+###### rodne_pid CA ############################################
+#rodne_pid 1911 ca dataframe
+ca_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ca_rogue_ages_1911 <- ca_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ca_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ca_rogue_ages_1911 <- na.omit(ca_rogue_ages_1911)
+
+#rodne_pid 2011 ca dataframe
+ca_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ca_rogue_ages_2011 <- ca_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ca_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ca_rogue_ages_2011 <- na.omit(ca_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ca <- rbind(ca_rogue_ages_1911, ca_rogue_ages_2011)
+
+###### rodne_pid MA ############################################
+#rodne_pid 1911 ma dataframe
+ma_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ma_rogue_ages_1911 <- ma_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ma_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ma_rogue_ages_1911 <- na.omit(ma_rogue_ages_1911)
+
+#rodne_pid 2011 ma dataframe
+ma_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ma_rogue_ages_2011 <- ma_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ma_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ma_rogue_ages_2011 <- na.omit(ma_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ma <- rbind(ma_rogue_ages_1911, ma_rogue_ages_2011)
+
+###### rodne_pid VA ############################################
+#rodne_pid 1911 va dataframe
+va_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+va_rogue_ages_1911 <- va_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(va_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+va_rogue_ages_1911 <- na.omit(va_rogue_ages_1911)
+
+#rodne_pid 2011 va dataframe
+va_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+va_rogue_ages_2011 <- va_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(va_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+va_rogue_ages_2011 <- na.omit(va_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_va <- rbind(va_rogue_ages_1911, va_rogue_ages_2011)
+```
+
+
+```{r}
+# A brief look at the overall site diameter distributions
+combined_rogue_stem_data <- rbind(aa_rogue_ages_2011, aa_rogue_ages_1911, ab_rogue_ages_2011, ab_rogue_ages_1911, ac_rogue_ages_2011, ac_rogue_ages_1911, ad_rogue_ages_2011, ad_rogue_ages_1911, ba_rogue_ages_2011, ba_rogue_ages_1911, ca_rogue_ages_2011, ca_rogue_ages_1911, ma_rogue_ages_2011, ma_rogue_ages_1911, va_rogue_ages_2011, va_rogue_ages_1911)
+
+# Distributions
+# Overall diameter distributions for 1911 and 2011
+ggplot(combined_rogue_stem_data, aes(y = dbh, fill = factor(year))) +
+  geom_boxplot() +
+  scale_y_continuous(name = "Diameter (in)") +
+  labs(title = "Diameter Distribution in 1911 and 2011",
+       y = "Diameter (in)",
+       fill = "Year") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(face = "bold"),
+    axis.title.y = element_text(face = "bold"),
+    axis.text.x = element_blank())
+```
+
+# Color Palette
+
+```{r}
+# Defining a color-blind friendly palette for all present tree species
+color_palette <- c(
+    "ABCO" = "#332288", 
+    "ABMAS" = "#88CCEE", 
+    "ACMA" = "#999933",
+    "ARME" = "#AA4499", 
+    "CADE" = "#CC6677", 
+    "CHCH" = "#44AA99",
+    "PILA" = "#882255", 
+    "PIPO" = "#DDCC77", 
+    "PSME" = "#6699cc",
+    "QUCH" = "#117733", 
+    "QUGA" = "#661100", 
+    "QUKE" = "#888888")
+```
+
+# All Stem Map Plots (Standard)
+
+```{r}
+# AA
+aaplot <- ggplot(combined_data_aa, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Ashland Watershed - Horn Gap Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+aaplot
+
+# AB
+abplot <- ggplot(combined_data_ab, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Ashland Watershed - Coggins Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+abplot
+
+# AC
+acplot <- ggplot(combined_data_ac, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Ashland Watershed - Winburn Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+acplot
+
+# AD
+adplot <- ggplot(combined_data_ad, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Ashland Watershed - West Fork Ashland Creek Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+adplot
+
+# BA
+baplot <- ggplot(combined_data_ba, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Big Butte Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+baplot
+
+# CA
+caplot <- ggplot(combined_data_ca, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Trail Creek Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+caplot
+
+# MA
+maplot <- ggplot(combined_data_ma, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Emigrant Creek Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+maplot
+
+# VA
+vaplot <- ggplot(combined_data_va, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Evans Creek Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+vaplot
+```
+
+File Saves for the plots (Standard)
+
+```{r}
+ggsave(filename = "Graphics/aa_stem_map_plot_standard.png", plot = aaplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ab_stem_map_plot_standard.png", plot = abplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ac_stem_map_plot_standard.png", plot = acplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ad_stem_map_plot_standard.png", plot = adplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ba_stem_map_plot_standard.png", plot = baplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ca_stem_map_plot_standard.png", plot = caplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ma_stem_map_plot_standard.png", plot = maplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/va_stem_map_plot_standard.png", plot = vaplot, width = 10, height = 5, dpi = 300)
+```
+
+# All Stem Map Plots (Metric)
+
+```{r}
+# AA
+aaplot <- ggplot(combined_data_aa, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(25, 30, 50, 80, 100, 180)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Ashland Watershed - Horn Gap Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+aaplot
+
+# AB
+abplot <- ggplot(combined_data_ab, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(25, 30, 50, 80, 100, 180)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Ashland Watershed - Coggins Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+abplot
+
+# AC
+acplot <- ggplot(combined_data_ac, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(25, 30, 50, 80, 100, 180)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Ashland Watershed - Winburn Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+acplot
+
+# AD
+adplot <- ggplot(combined_data_ad, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(25, 30, 50, 80, 100, 180)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Ashland Watershed - West Fork Ashland Creek Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+adplot
+
+# BA
+baplot <- ggplot(combined_data_ba, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(25, 30, 50, 80, 100, 180)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Big Butte Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+baplot
+
+# CA
+caplot <- ggplot(combined_data_ca, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(25, 30, 50, 80, 100, 180)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Trail Creek Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+caplot
+
+# MA
+maplot <- ggplot(combined_data_ma, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(25, 30, 50, 80, 100, 180)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Emigrant Creek Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+maplot
+
+# VA
+vaplot <- ggplot(combined_data_va, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(25, 30, 50, 80, 100, 180)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Evans Creek Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+vaplot
+```
+
+File Saves for the plots (Metric)
+
+```{r}
+ggsave(filename = "Graphics/aa_stem_map_plot_metric.png", plot = aaplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ab_stem_map_plot_metric.png", plot = abplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ac_stem_map_plot_metric.png", plot = acplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ad_stem_map_plot_metric.png", plot = adplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ba_stem_map_plot_metric.png", plot = baplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ca_stem_map_plot_metric.png", plot = caplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/ma_stem_map_plot_metric.png", plot = maplot, width = 10, height = 5, dpi = 300)
+ggsave(filename = "Graphics/va_stem_map_plot_metric.png", plot = vaplot, width = 10, height = 5, dpi = 300)
+```
+
+
+Example for 2011 Evans Creek and save
+
+```{r}
+# Evans Creek for only 2011
+va_2011_plot <- ggplot(va_rogue_ages_2011, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(25, 30, 50, 80, 100, 180)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "Evans Creek 2011 Stem Map", color = "Species", size = "Diameter (cm)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white", color = NA),  # Remove plot border
+    panel.background = element_rect(fill = "white", color = NA), # Remove panel border
+    panel.border = element_blank(),  # Remove the thin black border
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326)
+va_2011_plot
+
+# Save
+ggsave(filename = "Graphics/va_2011_stem_map_plot_metric.png", plot = va_2011_plot, width = 8, height = 6, dpi = 300)
+```
+
+
+# AA Stem Map Plot
+
+```{r}
+ggplot(combined_data_aa, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "AA Stem Map", color = "Species", size = "Diameter (in)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()) +
+  annotation_scale(location = "bl", width_hint = 0.7, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326) +
+  labs(caption = "Scale: 100 m")
+```
+
+# AB Stem Map Plot
+
+```{r}
+ggplot(combined_data_ab, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "AB Stem Map", color = "Species", size = "Diameter (in)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()) +
+  annotation_scale(location = "bl", width_hint = 0.7, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326) +
+  labs(caption = "Scale: 100 m")
+```
+
+# AC Stem Map Plot
+
+```{r}
+ggplot(combined_data_ac, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "AC Stem Map", color = "Species", size = "Diameter (in)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()) +
+  annotation_scale(location = "bl", width_hint = 0.7, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326) +
+  labs(caption = "Scale: 100 m")
+```
+
+
+# AD Stem Map Plot
+
+```{r}
+ggplot(combined_data_ad, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "AD Stem Map", color = "Species", size = "Diameter (in)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326) +
+  labs(caption = "Scale: 100 m")
+```
+
+# BA Stem Map Plot
+
+```{r}
+ggplot(combined_data_ba, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "BA Stem Map", color = "Species", size = "Diameter (in)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326) +
+  labs(caption = "Scale: 100 m")
+```
+
+# CA Stem Map Plot
+
+```{r}
+ggplot(combined_data_ca, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "CA Stem Map", color = "Species", size = "Diameter (in)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326) +
+  labs(caption = "Scale: 100 m")
+```
+
+# MA Stem Map Plot
+
+```{r}
+ggplot(combined_data_ma, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "MA Stem Map", color = "Species", size = "Diameter (in)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326) +
+  labs(caption = "Scale: 100 m")
+```
+
+# VA Stem Map Plot
+
+```{r}
+ggplot(combined_data_va, aes(x = x, y = y, color = spcd, size = cut(dbh, breaks = c(10, 17, 26, 32, 70)))) +
+  geom_point() +
+  scale_color_manual(values = color_palette) +
+  labs(title = "VA Stem Map", color = "Species", size = "Diameter (in)") +
+  guides(color = guide_legend(override.aes = list(size = 4))) +  # Adjust legend size
+  facet_wrap(~year) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.background = element_rect(fill = "white"),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank()) +
+  annotation_scale(location = "bl", width_hint = 0.5, height = unit(0.3, "cm"), text_cex = 0.9) +
+  coord_sf(crs = 4326) +
+  labs(caption = "Scale: 100 m")
+```

@@ -1,0 +1,1112 @@
+---
+title: "kNN_part_4_ICO_graphs"
+author: "Sven Rodne"
+date: "2024-07-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Clear the runway
+rm(list=ls()) 
+```
+
+# Ready the libraries
+
+```{r, warning=FALSE}
+# Required packages
+library(tidyverse)
+library(dplyr)
+library(sf)
+library(tidyr)
+library(sp)
+library(igraph)
+library(reshape2)
+library(here)
+```
+
+# Data Pull
+
+```{r}
+rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+```
+
+# Data Prep
+
+```{r}
+###### rodne_pid AA ############################################
+#rodne_pid 1850 aa dataframe
+aa_rogue_ages_1850 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA"& include_1850=="YES" & diam_in_1850>10)
+aa_rogue_ages_1850 <- aa_rogue_ages_1850[,c("rodne_uid", "x", "y", "diam_in_1850", "spcd")]
+colnames(aa_rogue_ages_1850) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+aa_rogue_ages_1850 <- na.omit(aa_rogue_ages_1850)
+
+#rodne_pid 1911 aa dataframe
+aa_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA"& include_1911=="YES" & diam_in_1911>10)
+aa_rogue_ages_1911 <- aa_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]
+colnames(aa_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+aa_rogue_ages_1911 <- na.omit(aa_rogue_ages_1911)
+
+#rodne_pid 2011 aa dataframe
+aa_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_in_2011>10 & include_2011=="YES")
+aa_rogue_ages_2011 <- aa_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]
+colnames(aa_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+aa_rogue_ages_2011 <- na.omit(aa_rogue_ages_2011)
+
+###### rodne_pid AB ############################################
+#rodne_pid 1850 ab dataframe
+ab_rogue_ages_1850 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_in_1850>10 & include_1850=="YES")
+ab_rogue_ages_1850 <- ab_rogue_ages_1850[,c("rodne_uid", "x", "y", "diam_in_1850", "spcd")]
+colnames(ab_rogue_ages_1850) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ab_rogue_ages_1850 <- na.omit(ab_rogue_ages_1850)
+
+#rodne_pid 1911 ab dataframe
+ab_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_in_1911>10 & include_1911=="YES")
+ab_rogue_ages_1911 <- ab_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]
+colnames(ab_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ab_rogue_ages_1911 <- na.omit(ab_rogue_ages_1911)
+
+#rodne_pid 2011 ab dataframe
+ab_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_in_2011>10 & include_2011=="YES")
+ab_rogue_ages_2011 <- ab_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]
+colnames(ab_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ab_rogue_ages_2011 <- na.omit(ab_rogue_ages_2011)
+
+###### rodne_pid AC ############################################
+#rodne_pid 1850 ac dataframe
+ac_rogue_ages_1850 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_in_1850>10 & include_1850=="YES")
+ac_rogue_ages_1850 <- ac_rogue_ages_1850[,c("rodne_uid", "x", "y", "diam_in_1850", "spcd")]
+colnames(ac_rogue_ages_1850) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ac_rogue_ages_1850 <- na.omit(ac_rogue_ages_1850)
+
+#rodne_pid 1911 ac dataframe
+ac_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_in_1911>10 & include_1911=="YES")
+ac_rogue_ages_1911 <- ac_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]
+colnames(ac_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ac_rogue_ages_1911 <- na.omit(ac_rogue_ages_1911)
+
+#rodne_pid 2011 ac dataframe
+ac_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_in_2011>10 & include_2011=="YES")
+ac_rogue_ages_2011 <- ac_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]
+colnames(ac_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ac_rogue_ages_2011 <- na.omit(ac_rogue_ages_2011)
+
+###### rodne_pid AD ############################################
+#rodne_pid 1850 ad dataframe
+ad_rogue_ages_1850 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_in_1850>10 & include_1850=="YES")
+ad_rogue_ages_1850 <- ad_rogue_ages_1850[,c("rodne_uid", "x", "y", "diam_in_1850", "spcd")]
+colnames(ad_rogue_ages_1850) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ad_rogue_ages_1850 <- na.omit(ad_rogue_ages_1850)
+
+#rodne_pid 1911 ad dataframe
+ad_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_in_1911>10 & include_1911=="YES")
+ad_rogue_ages_1911 <- ad_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]
+colnames(ad_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ad_rogue_ages_1911 <- na.omit(ad_rogue_ages_1911)
+
+#rodne_pid 2011 ad dataframe
+ad_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_in_2011>10 & include_2011=="YES")
+ad_rogue_ages_2011 <- ad_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]
+colnames(ad_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ad_rogue_ages_2011 <- na.omit(ad_rogue_ages_2011)
+
+###### rodne_pid BA ############################################
+#rodne_pid 1850 ba dataframe
+ba_rogue_ages_1850 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_in_1850>10 & include_1850=="YES")
+ba_rogue_ages_1850 <- ba_rogue_ages_1850[,c("rodne_uid", "x", "y", "diam_in_1850", "spcd")]
+colnames(ba_rogue_ages_1850) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ba_rogue_ages_1850 <- na.omit(ba_rogue_ages_1850)
+
+#rodne_pid 1911 ba dataframe
+ba_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_in_1911>10 & include_1911=="YES")
+ba_rogue_ages_1911 <- ba_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]
+colnames(ba_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ba_rogue_ages_1911 <- na.omit(ba_rogue_ages_1911)
+
+#rodne_pid 2011 ba dataframe
+ba_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_in_2011>10 & include_2011=="YES")
+ba_rogue_ages_2011 <- ba_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]
+colnames(ba_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ba_rogue_ages_2011 <- na.omit(ba_rogue_ages_2011)
+
+###### rodne_pid CA ############################################
+#rodne_pid 1850 ca dataframe
+ca_rogue_ages_1850 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_in_1850>10 & include_1850=="YES")
+ca_rogue_ages_1850 <- ca_rogue_ages_1850[,c("rodne_uid", "x", "y", "diam_in_1850", "spcd")]
+colnames(ca_rogue_ages_1850) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ca_rogue_ages_1850 <- na.omit(ca_rogue_ages_1850)
+
+#rodne_pid 1911 ca dataframe
+ca_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_in_1911>10 & include_1911=="YES")
+ca_rogue_ages_1911 <- ca_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]
+colnames(ca_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ca_rogue_ages_1911 <- na.omit(ca_rogue_ages_1911)
+
+#rodne_pid 2011 ca dataframe
+ca_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_in_2011>10 & include_2011=="YES")
+ca_rogue_ages_2011 <- ca_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]
+colnames(ca_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ca_rogue_ages_2011 <- na.omit(ca_rogue_ages_2011)
+
+###### rodne_pid MA ############################################
+#rodne_pid 1850 ma dataframe
+ma_rogue_ages_1850 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_in_1850>10 & include_1850=="YES")
+ma_rogue_ages_1850 <- ma_rogue_ages_1850[,c("rodne_uid", "x", "y", "diam_in_1850", "spcd")]
+colnames(ma_rogue_ages_1850) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ma_rogue_ages_1850 <- na.omit(ma_rogue_ages_1850)
+
+#rodne_pid 1911 ma dataframe
+ma_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_in_1911>10 & include_1911=="YES")
+ma_rogue_ages_1911 <- ma_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]
+colnames(ma_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ma_rogue_ages_1911 <- na.omit(ma_rogue_ages_1911)
+
+#rodne_pid 2011 ma dataframe
+ma_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_in_2011>10 & include_2011=="YES")
+ma_rogue_ages_2011 <- ma_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]
+colnames(ma_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+ma_rogue_ages_2011 <- na.omit(ma_rogue_ages_2011)
+
+###### rodne_pid VA ############################################
+#rodne_pid 1850 va dataframe
+va_rogue_ages_1850 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_in_1850>10 & include_1850=="YES")
+va_rogue_ages_1850 <- va_rogue_ages_1850[,c("rodne_uid", "x", "y", "diam_in_1850", "spcd")]
+colnames(va_rogue_ages_1850) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+va_rogue_ages_1850 <- na.omit(va_rogue_ages_1850)
+
+#rodne_pid 1911 va dataframe
+va_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_in_1911>10 & include_1911=="YES")
+va_rogue_ages_1911 <- va_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_in_1911", "spcd")]
+colnames(va_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+va_rogue_ages_1911 <- na.omit(va_rogue_ages_1911)
+
+#rodne_pid 2011 va dataframe
+va_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_in_2011>10 & include_2011=="YES")
+va_rogue_ages_2011 <- va_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_in_2011", "spcd")]
+colnames(va_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd")
+va_rogue_ages_2011 <- na.omit(va_rogue_ages_2011)
+```
+
+# Spatial Function
+
+```{r}
+calculate_clump_sizes <- function(data, buffer_size) {
+  # Convert the trees to sf object
+  trees_sf <- st_as_sf(data, coords = c("x", "y"))
+  
+  # Set CRS
+  trees_sf <- st_set_crs(trees_sf, "EPSG:4326")
+  
+  # Create unique ids using dplyr::mutate to avoid plyr conflicts
+  trees_sf <- trees_sf %>%
+    dplyr::mutate(tree_id = dplyr::row_number())
+  
+  # Create buffers
+  buffered_trees <- st_buffer(trees_sf, dist = buffer_size)
+  
+  # Find points whose buffers touch
+  intersects_list <- data.frame(st_intersects(buffered_trees, sparse = TRUE))
+  
+  # Create a graph from the data frame
+  graph <- graph_from_data_frame(intersects_list, directed = FALSE)
+  
+  # Find connected components
+  connected_components <- components(graph)$membership
+  
+  # Add a new column to the original data frame indicating the connected component
+  intersects_list$ConnectedComponent <- connected_components[match(intersects_list$row.id, names(connected_components))]
+  
+  # Keep only rows with unique row.id values
+  unique_intersects_list <- intersects_list %>%
+    distinct(row.id, .keep_all = TRUE)
+  unique_intersects_list$col.id <- NULL
+  
+  # Calculate clump sizes
+  clumps <- data.frame(table(unique_intersects_list$ConnectedComponent))
+  clumpnums <- data.frame(table(clumps$Freq))
+  colnames(clumpnums) <- c("clump_size", "num")
+  clumpnums$clump_size <- as.numeric(as.character(clumpnums$clump_size))
+  clumpnums$num <- as.numeric(as.character(clumpnums$num))
+  clumpnums$trees <- clumpnums$clump_size * clumpnums$num
+  
+  return(clumpnums[c("clump_size", "num", "trees")])
+}
+```
+
+# Running the Spatial Function and Portioning the Clump Sizes
+
+```{r}
+# Creating the individual dataframes containing clump sizes and trees
+buffer_size_m <- 6
+
+# AA stem map clump sizes
+clump_sizes_aa_1850 <- data.frame(calculate_clump_sizes(aa_rogue_ages_1850, buffer_size_m))
+colnames(clump_sizes_aa_1850) <- c("clump_size", "num1850", "trees1850")
+clump_sizes_aa_1911 <- data.frame(calculate_clump_sizes(aa_rogue_ages_1911, buffer_size_m))
+colnames(clump_sizes_aa_1911) <- c("clump_size", "num1911", "trees1911")
+clump_sizes_aa_2011 <- data.frame(calculate_clump_sizes(aa_rogue_ages_2011, buffer_size_m))
+colnames(clump_sizes_aa_2011) <- c("clump_size", "num2011", "trees2011")
+# Merge the all the aa stem map clump sizes
+merged_clump_sizes_aa <- merge(clump_sizes_aa_1850, clump_sizes_aa_1911, by = "clump_size", all = TRUE)
+merged_clump_sizes_aa <- merge(merged_clump_sizes_aa, clump_sizes_aa_2011, by = "clump_size", all = TRUE)
+
+# AB stem map clump sizes
+clump_sizes_ab_1850 <- data.frame(calculate_clump_sizes(ab_rogue_ages_1850, buffer_size_m))
+colnames(clump_sizes_ab_1850) <- c("clump_size", "num1850", "trees1850")
+clump_sizes_ab_1911 <- data.frame(calculate_clump_sizes(ab_rogue_ages_1911, buffer_size_m))
+colnames(clump_sizes_ab_1911) <- c("clump_size", "num1911", "trees1911")
+clump_sizes_ab_2011 <- data.frame(calculate_clump_sizes(ab_rogue_ages_2011, buffer_size_m))
+colnames(clump_sizes_ab_2011) <- c("clump_size", "num2011", "trees2011")
+# Merge the all the ab stem map clump sizes
+merged_clump_sizes_ab <- merge(clump_sizes_ab_1850, clump_sizes_ab_1911, by = "clump_size", all = TRUE)
+merged_clump_sizes_ab <- merge(merged_clump_sizes_ab, clump_sizes_ab_2011, by = "clump_size", all = TRUE)
+
+# ac stem map clump sizes
+clump_sizes_ac_1850 <- data.frame(calculate_clump_sizes(ac_rogue_ages_1850, buffer_size_m))
+colnames(clump_sizes_ac_1850) <- c("clump_size", "num1850", "trees1850")
+clump_sizes_ac_1911 <- data.frame(calculate_clump_sizes(ac_rogue_ages_1911, buffer_size_m))
+colnames(clump_sizes_ac_1911) <- c("clump_size", "num1911", "trees1911")
+clump_sizes_ac_2011 <- data.frame(calculate_clump_sizes(ac_rogue_ages_2011, buffer_size_m))
+colnames(clump_sizes_ac_2011) <- c("clump_size", "num2011", "trees2011")
+# Merge the all the ac stem map clump sizes
+merged_clump_sizes_ac <- merge(clump_sizes_ac_1850, clump_sizes_ac_1911, by = "clump_size", all = TRUE)
+merged_clump_sizes_ac <- merge(merged_clump_sizes_ac, clump_sizes_ac_2011, by = "clump_size", all = TRUE)
+
+# ad stem map clump sizes
+clump_sizes_ad_1850 <- data.frame(calculate_clump_sizes(ad_rogue_ages_1850, buffer_size_m))
+colnames(clump_sizes_ad_1850) <- c("clump_size", "num1850", "trees1850")
+clump_sizes_ad_1911 <- data.frame(calculate_clump_sizes(ad_rogue_ages_1911, buffer_size_m))
+colnames(clump_sizes_ad_1911) <- c("clump_size", "num1911", "trees1911")
+clump_sizes_ad_2011 <- data.frame(calculate_clump_sizes(ad_rogue_ages_2011, buffer_size_m))
+colnames(clump_sizes_ad_2011) <- c("clump_size", "num2011", "trees2011")
+# Merge the all the ad stem map clump sizes
+merged_clump_sizes_ad <- merge(clump_sizes_ad_1850, clump_sizes_ad_1911, by = "clump_size", all = TRUE)
+merged_clump_sizes_ad <- merge(merged_clump_sizes_ad, clump_sizes_ad_2011, by = "clump_size", all = TRUE)
+
+# ba stem map clump sizes
+clump_sizes_ba_1850 <- data.frame(calculate_clump_sizes(ba_rogue_ages_1850, buffer_size_m))
+colnames(clump_sizes_ba_1850) <- c("clump_size", "num1850", "trees1850")
+clump_sizes_ba_1911 <- data.frame(calculate_clump_sizes(ba_rogue_ages_1911, buffer_size_m))
+colnames(clump_sizes_ba_1911) <- c("clump_size", "num1911", "trees1911")
+clump_sizes_ba_2011 <- data.frame(calculate_clump_sizes(ba_rogue_ages_2011, buffer_size_m))
+colnames(clump_sizes_ba_2011) <- c("clump_size", "num2011", "trees2011")
+# Merge the all the ba stem map clump sizes
+merged_clump_sizes_ba <- merge(clump_sizes_ba_1850, clump_sizes_ba_1911, by = "clump_size", all = TRUE)
+merged_clump_sizes_ba <- merge(merged_clump_sizes_ba, clump_sizes_ba_2011, by = "clump_size", all = TRUE)
+
+# ca stem map clump sizes
+clump_sizes_ca_1850 <- data.frame(calculate_clump_sizes(ca_rogue_ages_1850, buffer_size_m))
+colnames(clump_sizes_ca_1850) <- c("clump_size", "num1850", "trees1850")
+clump_sizes_ca_1911 <- data.frame(calculate_clump_sizes(ca_rogue_ages_1911, buffer_size_m))
+colnames(clump_sizes_ca_1911) <- c("clump_size", "num1911", "trees1911")
+clump_sizes_ca_2011 <- data.frame(calculate_clump_sizes(ca_rogue_ages_2011, buffer_size_m))
+colnames(clump_sizes_ca_2011) <- c("clump_size", "num2011", "trees2011")
+# Merge the all the ca stem map clump sizes
+merged_clump_sizes_ca <- merge(clump_sizes_ca_1850, clump_sizes_ca_1911, by = "clump_size", all = TRUE)
+merged_clump_sizes_ca <- merge(merged_clump_sizes_ca, clump_sizes_ca_2011, by = "clump_size", all = TRUE)
+
+# ma stem map clump sizes
+clump_sizes_ma_1850 <- data.frame(calculate_clump_sizes(ma_rogue_ages_1850, buffer_size_m))
+colnames(clump_sizes_ma_1850) <- c("clump_size", "num1850", "trees1850")
+clump_sizes_ma_1911 <- data.frame(calculate_clump_sizes(ma_rogue_ages_1911, buffer_size_m))
+colnames(clump_sizes_ma_1911) <- c("clump_size", "num1911", "trees1911")
+clump_sizes_ma_2011 <- data.frame(calculate_clump_sizes(ma_rogue_ages_2011, buffer_size_m))
+colnames(clump_sizes_ma_2011) <- c("clump_size", "num2011", "trees2011")
+# Merge the all the ma stem map clump sizes
+merged_clump_sizes_ma <- merge(clump_sizes_ma_1850, clump_sizes_ma_1911, by = "clump_size", all = TRUE)
+merged_clump_sizes_ma <- merge(merged_clump_sizes_ma, clump_sizes_ma_2011, by = "clump_size", all = TRUE)
+
+# va stem map clump sizes
+clump_sizes_va_1850 <- data.frame(calculate_clump_sizes(va_rogue_ages_1850, buffer_size_m))
+colnames(clump_sizes_va_1850) <- c("clump_size", "num1850", "trees1850")
+clump_sizes_va_1911 <- data.frame(calculate_clump_sizes(va_rogue_ages_1911, buffer_size_m))
+colnames(clump_sizes_va_1911) <- c("clump_size", "num1911", "trees1911")
+clump_sizes_va_2011 <- data.frame(calculate_clump_sizes(va_rogue_ages_2011, buffer_size_m))
+colnames(clump_sizes_va_2011) <- c("clump_size", "num2011", "trees2011")
+# Merge the all the va stem map clump sizes
+merged_clump_sizes_va <- merge(clump_sizes_va_1850, clump_sizes_va_1911, by = "clump_size", all = TRUE)
+merged_clump_sizes_va <- merge(merged_clump_sizes_va, clump_sizes_va_2011, by = "clump_size", all = TRUE)
+
+##### finding the tree proportions of each of the clump sizes
+merged_clump_sizes_aa <- merged_clump_sizes_aa %>%
+  mutate(prop1850trees = trees1850 / sum(trees1850, na.rm = TRUE)) %>%
+  mutate(prop1911trees = trees1911 / sum(trees1911, na.rm = TRUE)) %>%
+  mutate(prop2011trees = trees2011 / sum(trees2011, na.rm = TRUE))
+merged_clump_sizes_ab <- merged_clump_sizes_ab %>%
+  mutate(prop1850trees = trees1850 / sum(trees1850, na.rm = TRUE)) %>%
+  mutate(prop1911trees = trees1911 / sum(trees1911, na.rm = TRUE)) %>%
+  mutate(prop2011trees = trees2011 / sum(trees2011, na.rm = TRUE))
+merged_clump_sizes_ac <- merged_clump_sizes_ac %>%
+  mutate(prop1850trees = trees1850 / sum(trees1850, na.rm = TRUE)) %>%
+  mutate(prop1911trees = trees1911 / sum(trees1911, na.rm = TRUE)) %>%
+  mutate(prop2011trees = trees2011 / sum(trees2011, na.rm = TRUE))
+merged_clump_sizes_ad <- merged_clump_sizes_ad %>%
+  mutate(prop1850trees = trees1850 / sum(trees1850, na.rm = TRUE)) %>%
+  mutate(prop1911trees = trees1911 / sum(trees1911, na.rm = TRUE)) %>%
+  mutate(prop2011trees = trees2011 / sum(trees2011, na.rm = TRUE))
+merged_clump_sizes_ba <- merged_clump_sizes_ba %>%
+  mutate(prop1850trees = trees1850 / sum(trees1850, na.rm = TRUE)) %>%
+  mutate(prop1911trees = trees1911 / sum(trees1911, na.rm = TRUE)) %>%
+  mutate(prop2011trees = trees2011 / sum(trees2011, na.rm = TRUE))
+merged_clump_sizes_ca <- merged_clump_sizes_ca %>%
+  mutate(prop1850trees = trees1850 / sum(trees1850, na.rm = TRUE)) %>%
+  mutate(prop1911trees = trees1911 / sum(trees1911, na.rm = TRUE)) %>%
+  mutate(prop2011trees = trees2011 / sum(trees2011, na.rm = TRUE))
+merged_clump_sizes_ma <- merged_clump_sizes_ma %>%
+  mutate(prop1850trees = trees1850 / sum(trees1850, na.rm = TRUE)) %>%
+  mutate(prop1911trees = trees1911 / sum(trees1911, na.rm = TRUE)) %>%
+  mutate(prop2011trees = trees2011 / sum(trees2011, na.rm = TRUE))
+merged_clump_sizes_va <- merged_clump_sizes_va %>%
+  mutate(prop1850trees = trees1850 / sum(trees1850, na.rm = TRUE)) %>%
+  mutate(prop1911trees = trees1911 / sum(trees1911, na.rm = TRUE)) %>%
+  mutate(prop2011trees = trees2011 / sum(trees2011, na.rm = TRUE))
+
+# Create a new column 'CombinedClumpSize' based on your specified ranges
+
+# AA
+
+prop_merged_clump_size_aa <- merged_clump_sizes_aa %>%
+  # Step 1: Create 'combinedclumpsize' categories, using dplyr::mutate explicitly
+  dplyr::mutate(
+    combinedclumpsize = dplyr::case_when(
+      clump_size == 1 ~ "1",
+      clump_size %in% 2:4 ~ "2-4",
+      clump_size %in% 5:9 ~ "5-9",
+      clump_size %in% 10:14 ~ "10-14",
+      clump_size %in% 15:30 ~ "15-30",
+      clump_size > 30 ~ ">30",
+      TRUE ~ "Other"
+    )
+  ) %>%
+  
+  # Step 2: Group by 'combinedclumpsize' to calculate summaries
+  dplyr::group_by(combinedclumpsize) %>%
+  dplyr::summarize(
+    trees1850comb = sum(trees1850, na.rm = TRUE),
+    trees1911comb = sum(trees1911, na.rm = TRUE),
+    trees2011comb = sum(trees2011, na.rm = TRUE),
+    prop1850treescomb = sum(prop1850trees, na.rm = TRUE),
+    prop1911treescomb = sum(prop1911trees, na.rm = TRUE),
+    prop2011treescomb = sum(prop2011trees, na.rm = TRUE),
+    .groups = "drop"  # Ensure groups are dropped after summarizing
+  ) %>%
+  
+  # Step 3: Add 'clumpnums' based on 'combinedclumpsize'
+  dplyr::mutate(
+    clumpnums = dplyr::case_when(
+      combinedclumpsize == "1" ~ 1,
+      combinedclumpsize == "2-4" ~ 2,
+      combinedclumpsize == "5-9" ~ 3,
+      combinedclumpsize == "10-14" ~ 4,
+      combinedclumpsize == "15-30" ~ 5,
+      combinedclumpsize == ">30" ~ 6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  
+  # Step 4: Add 'rodne_pid'
+  dplyr::mutate(
+    rodne_pid = "AA"
+  )
+
+
+# AB
+
+prop_merged_clump_size_ab <- merged_clump_sizes_ab %>%
+  # Step 1: Create 'combinedclumpsize' categories, using dplyr::mutate explicitly
+  dplyr::mutate(
+    combinedclumpsize = dplyr::case_when(
+      clump_size == 1 ~ "1",
+      clump_size %in% 2:4 ~ "2-4",
+      clump_size %in% 5:9 ~ "5-9",
+      clump_size %in% 10:14 ~ "10-14",
+      clump_size %in% 15:30 ~ "15-30",
+      clump_size > 30 ~ ">30",
+      TRUE ~ "Other"
+    )
+  ) %>%
+  
+  # Step 2: Group by 'combinedclumpsize' to calculate summaries
+  dplyr::group_by(combinedclumpsize) %>%
+  dplyr::summarize(
+    trees1850comb = sum(trees1850, na.rm = TRUE),
+    trees1911comb = sum(trees1911, na.rm = TRUE),
+    trees2011comb = sum(trees2011, na.rm = TRUE),
+    prop1850treescomb = sum(prop1850trees, na.rm = TRUE),
+    prop1911treescomb = sum(prop1911trees, na.rm = TRUE),
+    prop2011treescomb = sum(prop2011trees, na.rm = TRUE),
+    .groups = "drop"  # Ensure groups are dropped after summarizing
+  ) %>%
+  
+  # Step 3: Add 'clumpnums' based on 'combinedclumpsize'
+  dplyr::mutate(
+    clumpnums = dplyr::case_when(
+      combinedclumpsize == "1" ~ 1,
+      combinedclumpsize == "2-4" ~ 2,
+      combinedclumpsize == "5-9" ~ 3,
+      combinedclumpsize == "10-14" ~ 4,
+      combinedclumpsize == "15-30" ~ 5,
+      combinedclumpsize == ">30" ~ 6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  
+  # Step 4: Add 'rodne_pid'
+  dplyr::mutate(
+    rodne_pid = "AB"
+  )
+
+#ac
+
+prop_merged_clump_size_ac <- merged_clump_sizes_ac %>%
+  # Step 1: Create 'combinedclumpsize' categories, using dplyr::mutate explicitly
+  dplyr::mutate(
+    combinedclumpsize = dplyr::case_when(
+      clump_size == 1 ~ "1",
+      clump_size %in% 2:4 ~ "2-4",
+      clump_size %in% 5:9 ~ "5-9",
+      clump_size %in% 10:14 ~ "10-14",
+      clump_size %in% 15:30 ~ "15-30",
+      clump_size > 30 ~ ">30",
+      TRUE ~ "Other"
+    )
+  ) %>%
+  
+  # Step 2: Group by 'combinedclumpsize' to calculate summaries
+  dplyr::group_by(combinedclumpsize) %>%
+  dplyr::summarize(
+    trees1850comb = sum(trees1850, na.rm = TRUE),
+    trees1911comb = sum(trees1911, na.rm = TRUE),
+    trees2011comb = sum(trees2011, na.rm = TRUE),
+    prop1850treescomb = sum(prop1850trees, na.rm = TRUE),
+    prop1911treescomb = sum(prop1911trees, na.rm = TRUE),
+    prop2011treescomb = sum(prop2011trees, na.rm = TRUE),
+    .groups = "drop"  # Ensure groups are dropped after summarizing
+  ) %>%
+  
+  # Step 3: Add 'clumpnums' based on 'combinedclumpsize'
+  dplyr::mutate(
+    clumpnums = dplyr::case_when(
+      combinedclumpsize == "1" ~ 1,
+      combinedclumpsize == "2-4" ~ 2,
+      combinedclumpsize == "5-9" ~ 3,
+      combinedclumpsize == "10-14" ~ 4,
+      combinedclumpsize == "15-30" ~ 5,
+      combinedclumpsize == ">30" ~ 6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  
+  # Step 4: Add 'rodne_pid'
+  dplyr::mutate(
+    rodne_pid = "AC"
+  )
+
+#ad
+
+prop_merged_clump_size_ad <- merged_clump_sizes_ad %>%
+  # Step 1: Create 'combinedclumpsize' categories, using dplyr::mutate explicitly
+  dplyr::mutate(
+    combinedclumpsize = dplyr::case_when(
+      clump_size == 1 ~ "1",
+      clump_size %in% 2:4 ~ "2-4",
+      clump_size %in% 5:9 ~ "5-9",
+      clump_size %in% 10:14 ~ "10-14",
+      clump_size %in% 15:30 ~ "15-30",
+      clump_size > 30 ~ ">30",
+      TRUE ~ "Other"
+    )
+  ) %>%
+  
+  # Step 2: Group by 'combinedclumpsize' to calculate summaries
+  dplyr::group_by(combinedclumpsize) %>%
+  dplyr::summarize(
+    trees1850comb = sum(trees1850, na.rm = TRUE),
+    trees1911comb = sum(trees1911, na.rm = TRUE),
+    trees2011comb = sum(trees2011, na.rm = TRUE),
+    prop1850treescomb = sum(prop1850trees, na.rm = TRUE),
+    prop1911treescomb = sum(prop1911trees, na.rm = TRUE),
+    prop2011treescomb = sum(prop2011trees, na.rm = TRUE),
+    .groups = "drop"  # Ensure groups are dropped after summarizing
+  ) %>%
+  
+  # Step 3: Add 'clumpnums' based on 'combinedclumpsize'
+  dplyr::mutate(
+    clumpnums = dplyr::case_when(
+      combinedclumpsize == "1" ~ 1,
+      combinedclumpsize == "2-4" ~ 2,
+      combinedclumpsize == "5-9" ~ 3,
+      combinedclumpsize == "10-14" ~ 4,
+      combinedclumpsize == "15-30" ~ 5,
+      combinedclumpsize == ">30" ~ 6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  
+  # Step 4: Add 'rodne_pid'
+  dplyr::mutate(
+    rodne_pid = "AD"
+  )
+
+#ba
+
+prop_merged_clump_size_ba <- merged_clump_sizes_ba %>%
+  # Step 1: Create 'combinedclumpsize' categories, using dplyr::mutate explicitly
+  dplyr::mutate(
+    combinedclumpsize = dplyr::case_when(
+      clump_size == 1 ~ "1",
+      clump_size %in% 2:4 ~ "2-4",
+      clump_size %in% 5:9 ~ "5-9",
+      clump_size %in% 10:14 ~ "10-14",
+      clump_size %in% 15:30 ~ "15-30",
+      clump_size > 30 ~ ">30",
+      TRUE ~ "Other"
+    )
+  ) %>%
+  
+  # Step 2: Group by 'combinedclumpsize' to calculate summaries
+  dplyr::group_by(combinedclumpsize) %>%
+  dplyr::summarize(
+    trees1850comb = sum(trees1850, na.rm = TRUE),
+    trees1911comb = sum(trees1911, na.rm = TRUE),
+    trees2011comb = sum(trees2011, na.rm = TRUE),
+    prop1850treescomb = sum(prop1850trees, na.rm = TRUE),
+    prop1911treescomb = sum(prop1911trees, na.rm = TRUE),
+    prop2011treescomb = sum(prop2011trees, na.rm = TRUE),
+    .groups = "drop"  # Ensure groups are dropped after summarizing
+  ) %>%
+  
+  # Step 3: Add 'clumpnums' based on 'combinedclumpsize'
+  dplyr::mutate(
+    clumpnums = dplyr::case_when(
+      combinedclumpsize == "1" ~ 1,
+      combinedclumpsize == "2-4" ~ 2,
+      combinedclumpsize == "5-9" ~ 3,
+      combinedclumpsize == "10-14" ~ 4,
+      combinedclumpsize == "15-30" ~ 5,
+      combinedclumpsize == ">30" ~ 6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  
+  # Step 4: Add 'rodne_pid'
+  dplyr::mutate(
+    rodne_pid = "BA"
+  )
+
+#ca
+
+prop_merged_clump_size_ca <- merged_clump_sizes_ca %>%
+  # Step 1: Create 'combinedclumpsize' categories, using dplyr::mutate explicitly
+  dplyr::mutate(
+    combinedclumpsize = dplyr::case_when(
+      clump_size == 1 ~ "1",
+      clump_size %in% 2:4 ~ "2-4",
+      clump_size %in% 5:9 ~ "5-9",
+      clump_size %in% 10:14 ~ "10-14",
+      clump_size %in% 15:30 ~ "15-30",
+      clump_size > 30 ~ ">30",
+      TRUE ~ "Other"
+    )
+  ) %>%
+  
+  # Step 2: Group by 'combinedclumpsize' to calculate summaries
+  dplyr::group_by(combinedclumpsize) %>%
+  dplyr::summarize(
+    trees1850comb = sum(trees1850, na.rm = TRUE),
+    trees1911comb = sum(trees1911, na.rm = TRUE),
+    trees2011comb = sum(trees2011, na.rm = TRUE),
+    prop1850treescomb = sum(prop1850trees, na.rm = TRUE),
+    prop1911treescomb = sum(prop1911trees, na.rm = TRUE),
+    prop2011treescomb = sum(prop2011trees, na.rm = TRUE),
+    .groups = "drop"  # Ensure groups are dropped after summarizing
+  ) %>%
+  
+  # Step 3: Add 'clumpnums' based on 'combinedclumpsize'
+  dplyr::mutate(
+    clumpnums = dplyr::case_when(
+      combinedclumpsize == "1" ~ 1,
+      combinedclumpsize == "2-4" ~ 2,
+      combinedclumpsize == "5-9" ~ 3,
+      combinedclumpsize == "10-14" ~ 4,
+      combinedclumpsize == "15-30" ~ 5,
+      combinedclumpsize == ">30" ~ 6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  
+  # Step 4: Add 'rodne_pid'
+  dplyr::mutate(
+    rodne_pid = "CA"
+  )
+
+#ma
+
+prop_merged_clump_size_ma <- merged_clump_sizes_ma %>%
+  # Step 1: Create 'combinedclumpsize' categories, using dplyr::mutate explicitly
+  dplyr::mutate(
+    combinedclumpsize = dplyr::case_when(
+      clump_size == 1 ~ "1",
+      clump_size %in% 2:4 ~ "2-4",
+      clump_size %in% 5:9 ~ "5-9",
+      clump_size %in% 10:14 ~ "10-14",
+      clump_size %in% 15:30 ~ "15-30",
+      clump_size > 30 ~ ">30",
+      TRUE ~ "Other"
+    )
+  ) %>%
+  
+  # Step 2: Group by 'combinedclumpsize' to calculate summaries
+  dplyr::group_by(combinedclumpsize) %>%
+  dplyr::summarize(
+    trees1850comb = sum(trees1850, na.rm = TRUE),
+    trees1911comb = sum(trees1911, na.rm = TRUE),
+    trees2011comb = sum(trees2011, na.rm = TRUE),
+    prop1850treescomb = sum(prop1850trees, na.rm = TRUE),
+    prop1911treescomb = sum(prop1911trees, na.rm = TRUE),
+    prop2011treescomb = sum(prop2011trees, na.rm = TRUE),
+    .groups = "drop"  # Ensure groups are dropped after summarizing
+  ) %>%
+  
+  # Step 3: Add 'clumpnums' based on 'combinedclumpsize'
+  dplyr::mutate(
+    clumpnums = dplyr::case_when(
+      combinedclumpsize == "1" ~ 1,
+      combinedclumpsize == "2-4" ~ 2,
+      combinedclumpsize == "5-9" ~ 3,
+      combinedclumpsize == "10-14" ~ 4,
+      combinedclumpsize == "15-30" ~ 5,
+      combinedclumpsize == ">30" ~ 6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  
+  # Step 4: Add 'rodne_pid'
+  dplyr::mutate(
+    rodne_pid = "MA"
+  )
+
+#va
+
+prop_merged_clump_size_va <- merged_clump_sizes_va %>%
+  # Step 1: Create 'combinedclumpsize' categories, using dplyr::mutate explicitly
+  dplyr::mutate(
+    combinedclumpsize = dplyr::case_when(
+      clump_size == 1 ~ "1",
+      clump_size %in% 2:4 ~ "2-4",
+      clump_size %in% 5:9 ~ "5-9",
+      clump_size %in% 10:14 ~ "10-14",
+      clump_size %in% 15:30 ~ "15-30",
+      clump_size > 30 ~ ">30",
+      TRUE ~ "Other"
+    )
+  ) %>%
+  
+  # Step 2: Group by 'combinedclumpsize' to calculate summaries
+  dplyr::group_by(combinedclumpsize) %>%
+  dplyr::summarize(
+    trees1850comb = sum(trees1850, na.rm = TRUE),
+    trees1911comb = sum(trees1911, na.rm = TRUE),
+    trees2011comb = sum(trees2011, na.rm = TRUE),
+    prop1850treescomb = sum(prop1850trees, na.rm = TRUE),
+    prop1911treescomb = sum(prop1911trees, na.rm = TRUE),
+    prop2011treescomb = sum(prop2011trees, na.rm = TRUE),
+    .groups = "drop"  # Ensure groups are dropped after summarizing
+  ) %>%
+  
+  # Step 3: Add 'clumpnums' based on 'combinedclumpsize'
+  dplyr::mutate(
+    clumpnums = dplyr::case_when(
+      combinedclumpsize == "1" ~ 1,
+      combinedclumpsize == "2-4" ~ 2,
+      combinedclumpsize == "5-9" ~ 3,
+      combinedclumpsize == "10-14" ~ 4,
+      combinedclumpsize == "15-30" ~ 5,
+      combinedclumpsize == ">30" ~ 6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  
+  # Step 4: Add 'rodne_pid'
+  dplyr::mutate(
+    rodne_pid = "VA"
+  )
+
+# Custom order and label for the plot
+custom_order <- c("1", "2-4", "5-9", "10-14", "15-30", ">30")
+legend_labels <- c("1850", "1911", "2011")
+```
+
+# ICO Graphs
+
+```{r}
+# All the stem maps
+prop_merged_all_stems <- bind_rows(prop_merged_clump_size_aa, prop_merged_clump_size_ab,
+                                   prop_merged_clump_size_ac, prop_merged_clump_size_ad,
+                                   prop_merged_clump_size_ba, prop_merged_clump_size_ca,
+                                   prop_merged_clump_size_ma, prop_merged_clump_size_va)
+only_props_all_stems <- prop_merged_all_stems[,c("combinedclumpsize", "prop1850treescomb", "prop1911treescomb", "prop2011treescomb")]
+
+# Plot
+# Melt the data frame to long format for easier plotting
+df_long <- melt(only_props_all_stems, id.vars = "combinedclumpsize")
+# Change the levels of the 'variable' factor column
+df_long <- df_long %>%
+  mutate(
+    variable = recode(variable, "prop1850treescomb" = "1850", "prop1911treescomb" = "1911", "prop2011treescomb" = "2011")
+  )
+colnames(df_long) <- c("combinedclumpsize", "year", "value")
+
+#the plot
+ggplot(df_long, aes(x = factor(combinedclumpsize, levels = custom_order), y = value, fill = year)) +
+  geom_boxplot() +
+  labs(
+    title = "Rogue Basin Clump Size Distributions",
+    x = "Clump Size Bin (n trees)",
+    y = "Proportion of Trees",
+    fill = "Year"
+  ) +
+  geom_vline(xintercept = 0.5:8, linetype = "dotted", color = "black", linewidth = 1) +
+  scale_fill_manual(values = c("1850" = "darkolivegreen", "1911" = "dodgerblue4", "2011" = "firebrick"),
+                    labels = legend_labels) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +  # Adjust the breaks as needed
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"))
+
+################################################################################
+# Ashland
+prop_merged_all_stems <- bind_rows(prop_merged_clump_size_aa, prop_merged_clump_size_ab,
+                                   prop_merged_clump_size_ac, prop_merged_clump_size_ad)
+only_props_all_stems <- prop_merged_all_stems[,c("combinedclumpsize", "prop1850treescomb", "prop1911treescomb", "prop2011treescomb")]
+
+# Plot
+# Melt the data frame to long format for easier plotting
+df_long <- melt(only_props_all_stems, id.vars = "combinedclumpsize")
+# Change the levels of the 'variable' factor column
+df_long <- df_long %>%
+  mutate(
+    variable = recode(variable, "prop1850treescomb" = "1850", "prop1911treescomb" = "1911", "prop2011treescomb" = "2011")
+  )
+colnames(df_long) <- c("combinedclumpsize", "year", "value")
+
+#the plot
+ggplot(df_long, aes(x = factor(combinedclumpsize, levels = custom_order), y = value, fill = year)) +
+  geom_boxplot() +
+  labs(
+    title = "Ashland Watershed Clump Size Distributions",
+    x = "Clump Size Bin (n trees)",
+    y = "Proportion of Trees",
+    fill = "Year"
+  ) +
+  geom_vline(xintercept = 0.5:8, linetype = "dotted", color = "black", linewidth = 1) +
+  scale_fill_manual(values = c("1850" = "darkolivegreen", "1911" = "dodgerblue4", "2011" = "firebrick"),
+                    labels = legend_labels) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +  # Adjust the breaks as needed
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"))
+
+################################################################################
+# AA
+prop_merged_all_stems <- prop_merged_clump_size_aa
+only_props_all_stems <- prop_merged_all_stems[,c("combinedclumpsize", "prop1850treescomb", "prop1911treescomb", "prop2011treescomb")]
+
+# Plot
+# Melt the data frame to long format for easier plotting
+df_long <- melt(only_props_all_stems, id.vars = "combinedclumpsize")
+# Change the levels of the 'variable' factor column
+df_long <- df_long %>%
+  mutate(
+    variable = recode(variable, "prop1850treescomb" = "1850", "prop1911treescomb" = "1911", "prop2011treescomb" = "2011")
+  )
+colnames(df_long) <- c("combinedclumpsize", "year", "value")
+
+#the plot
+ggplot(df_long, aes(x = factor(combinedclumpsize, levels = custom_order), y = value, fill = year)) +
+  geom_col(position = "dodge") +  # Use position = "dodge" to place bars side by side
+  labs(
+    title = "AA Stem Map Clump Size Distributions",
+    x = "Clump Size Bin (n trees)",
+    y = "Proportion of Trees",
+    fill = "Year"
+  ) +
+  geom_vline(xintercept = 0.5:8, linetype = "dotted", color = "black", linewidth = 1) +
+  scale_fill_manual(values = c("1850" = "darkolivegreen", "1911" = "dodgerblue4", "2011" = "firebrick"),
+                    labels = legend_labels) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +  # Adjust the breaks as needed
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white")
+  )
+
+################################################################################
+# AB
+prop_merged_all_stems <- prop_merged_clump_size_ab
+only_props_all_stems <- prop_merged_all_stems[,c("combinedclumpsize", "prop1850treescomb", "prop1911treescomb", "prop2011treescomb")]
+
+# Plot
+# Melt the data frame to long format for easier plotting
+df_long <- melt(only_props_all_stems, id.vars = "combinedclumpsize")
+# Change the levels of the 'variable' factor column
+df_long <- df_long %>%
+  mutate(
+    variable = recode(variable, "prop1850treescomb" = "1850", "prop1911treescomb" = "1911", "prop2011treescomb" = "2011")
+  )
+colnames(df_long) <- c("combinedclumpsize", "year", "value")
+
+#the plot
+ggplot(df_long, aes(x = factor(combinedclumpsize, levels = custom_order), y = value, fill = year)) +
+  geom_col(position = "dodge") +  # Use position = "dodge" to place bars side by side
+  labs(
+    title = "AB Stem Map Clump Size Distributions",
+    x = "Clump Size Bin (n trees)",
+    y = "Proportion of Trees",
+    fill = "Year"
+  ) +
+  geom_vline(xintercept = 0.5:8, linetype = "dotted", color = "black", linewidth = 1) +
+  scale_fill_manual(values = c("1850" = "darkolivegreen", "1911" = "dodgerblue4", "2011" = "firebrick"),
+                    labels = legend_labels) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +  # Adjust the breaks as needed
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white")
+  )
+
+################################################################################
+################################################################################
+# AC
+prop_merged_all_stems <- prop_merged_clump_size_ac
+only_props_all_stems <- prop_merged_all_stems[,c("combinedclumpsize", "prop1850treescomb", "prop1911treescomb", "prop2011treescomb")]
+
+# Plot
+# Melt the data frame to long format for easier plotting
+df_long <- melt(only_props_all_stems, id.vars = "combinedclumpsize")
+# Change the levels of the 'variable' factor column
+df_long <- df_long %>%
+  mutate(
+    variable = recode(variable, "prop1850treescomb" = "1850", "prop1911treescomb" = "1911", "prop2011treescomb" = "2011")
+  )
+colnames(df_long) <- c("combinedclumpsize", "year", "value")
+
+#the plot
+ggplot(df_long, aes(x = factor(combinedclumpsize, levels = custom_order), y = value, fill = year)) +
+  geom_col(position = "dodge") +  # Use position = "dodge" to place bars side by side
+  labs(
+    title = "AC Stem Map Clump Size Distributions",
+    x = "Clump Size Bin (n trees)",
+    y = "Proportion of Trees",
+    fill = "Year"
+  ) +
+  geom_vline(xintercept = 0.5:8, linetype = "dotted", color = "black", linewidth = 1) +
+  scale_fill_manual(values = c("1850" = "darkolivegreen", "1911" = "dodgerblue4", "2011" = "firebrick"),
+                    labels = legend_labels) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +  # Adjust the breaks as needed
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white")
+  )
+
+################################################################################
+# AD
+prop_merged_all_stems <- prop_merged_clump_size_ad
+only_props_all_stems <- prop_merged_all_stems[,c("combinedclumpsize", "prop1850treescomb", "prop1911treescomb", "prop2011treescomb")]
+
+# Plot
+# Melt the data frame to long format for easier plotting
+df_long <- melt(only_props_all_stems, id.vars = "combinedclumpsize")
+# Change the levels of the 'variable' factor column
+df_long <- df_long %>%
+  mutate(
+    variable = recode(variable, "prop1850treescomb" = "1850", "prop1911treescomb" = "1911", "prop2011treescomb" = "2011")
+  )
+colnames(df_long) <- c("combinedclumpsize", "year", "value")
+
+#the plot
+ggplot(df_long, aes(x = factor(combinedclumpsize, levels = custom_order), y = value, fill = year)) +
+  geom_col(position = "dodge") +  # Use position = "dodge" to place bars side by side
+  labs(
+    title = "AD Stem Map Clump Size Distributions",
+    x = "Clump Size Bin (n trees)",
+    y = "Proportion of Trees",
+    fill = "Year"
+  ) +
+  geom_vline(xintercept = 0.5:8, linetype = "dotted", color = "black", linewidth = 1) +
+  scale_fill_manual(values = c("1850" = "darkolivegreen", "1911" = "dodgerblue4", "2011" = "firebrick"),
+                    labels = legend_labels) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +  # Adjust the breaks as needed
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white")
+  )
+
+################################################################################
+# BA
+prop_merged_all_stems <- prop_merged_clump_size_ba
+only_props_all_stems <- prop_merged_all_stems[,c("combinedclumpsize", "prop1850treescomb", "prop1911treescomb", "prop2011treescomb")]
+
+# Plot
+# Melt the data frame to long format for easier plotting
+df_long <- melt(only_props_all_stems, id.vars = "combinedclumpsize")
+# Change the levels of the 'variable' factor column
+df_long <- df_long %>%
+  mutate(
+    variable = recode(variable, "prop1850treescomb" = "1850", "prop1911treescomb" = "1911", "prop2011treescomb" = "2011")
+  )
+colnames(df_long) <- c("combinedclumpsize", "year", "value")
+
+#the plot
+ggplot(df_long, aes(x = factor(combinedclumpsize, levels = custom_order), y = value, fill = year)) +
+  geom_col(position = "dodge") +  # Use position = "dodge" to place bars side by side
+  labs(
+    title = "BA Stem Map Clump Size Distributions",
+    x = "Clump Size Bin (n trees)",
+    y = "Proportion of Trees",
+    fill = "Year"
+  ) +
+  geom_vline(xintercept = 0.5:8, linetype = "dotted", color = "black", linewidth = 1) +
+  scale_fill_manual(values = c("1850" = "darkolivegreen", "1911" = "dodgerblue4", "2011" = "firebrick"),
+                    labels = legend_labels) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +  # Adjust the breaks as needed
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white")
+  )
+
+################################################################################
+# CA
+prop_merged_all_stems <- prop_merged_clump_size_ca
+only_props_all_stems <- prop_merged_all_stems[,c("combinedclumpsize", "prop1850treescomb", "prop1911treescomb", "prop2011treescomb")]
+
+# Plot
+# Melt the data frame to long format for easier plotting
+df_long <- melt(only_props_all_stems, id.vars = "combinedclumpsize")
+# Change the levels of the 'variable' factor column
+df_long <- df_long %>%
+  mutate(
+    variable = recode(variable, "prop1850treescomb" = "1850", "prop1911treescomb" = "1911", "prop2011treescomb" = "2011")
+  )
+colnames(df_long) <- c("combinedclumpsize", "year", "value")
+
+#the plot
+ggplot(df_long, aes(x = factor(combinedclumpsize, levels = custom_order), y = value, fill = year)) +
+  geom_col(position = "dodge") +  # Use position = "dodge" to place bars side by side
+  labs(
+    title = "CA Stem Map Clump Size Distributions",
+    x = "Clump Size Bin (n trees)",
+    y = "Proportion of Trees",
+    fill = "Year"
+  ) +
+  geom_vline(xintercept = 0.5:8, linetype = "dotted", color = "black", linewidth = 1) +
+  scale_fill_manual(values = c("1850" = "darkolivegreen", "1911" = "dodgerblue4", "2011" = "firebrick"),
+                    labels = legend_labels) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +  # Adjust the breaks as needed
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white")
+  )
+
+################################################################################
+# MA
+prop_merged_all_stems <- prop_merged_clump_size_ma
+only_props_all_stems <- prop_merged_all_stems[,c("combinedclumpsize", "prop1850treescomb", "prop1911treescomb", "prop2011treescomb")]
+
+# Plot
+# Melt the data frame to long format for easier plotting
+df_long <- melt(only_props_all_stems, id.vars = "combinedclumpsize")
+# Change the levels of the 'variable' factor column
+df_long <- df_long %>%
+  mutate(
+    variable = recode(variable, "prop1850treescomb" = "1850", "prop1911treescomb" = "1911", "prop2011treescomb" = "2011")
+  )
+colnames(df_long) <- c("combinedclumpsize", "year", "value")
+
+#the plot
+ggplot(df_long, aes(x = factor(combinedclumpsize, levels = custom_order), y = value, fill = year)) +
+  geom_col(position = "dodge") +  # Use position = "dodge" to place bars side by side
+  labs(
+    title = "MA Stem Map Clump Size Distributions",
+    x = "Clump Size Bin (n trees)",
+    y = "Proportion of Trees",
+    fill = "Year"
+  ) +
+  geom_vline(xintercept = 0.5:8, linetype = "dotted", color = "black", linewidth = 1) +
+  scale_fill_manual(values = c("1850" = "darkolivegreen", "1911" = "dodgerblue4", "2011" = "firebrick"),
+                    labels = legend_labels) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +  # Adjust the breaks as needed
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white")
+  )
+
+################################################################################
+# VA
+prop_merged_all_stems <- prop_merged_clump_size_va
+only_props_all_stems <- prop_merged_all_stems[,c("combinedclumpsize", "prop1850treescomb", "prop1911treescomb", "prop2011treescomb")]
+
+# Plot
+# Melt the data frame to long format for easier plotting
+df_long <- melt(only_props_all_stems, id.vars = "combinedclumpsize")
+# Change the levels of the 'variable' factor column
+df_long <- df_long %>%
+  mutate(
+    variable = recode(variable, "prop1850treescomb" = "1850", "prop1911treescomb" = "1911", "prop2011treescomb" = "2011")
+  )
+colnames(df_long) <- c("combinedclumpsize", "year", "value")
+
+#the plot
+ggplot(df_long, aes(x = factor(combinedclumpsize, levels = custom_order), y = value, fill = year)) +
+  geom_col(position = "dodge") +  # Use position = "dodge" to place bars side by side
+  labs(
+    title = "VA Stem Map Clump Size Distributions",
+    x = "Clump Size Bin (n trees)",
+    y = "Proportion of Trees",
+    fill = "Year"
+  ) +
+  geom_vline(xintercept = 0.5:8, linetype = "dotted", color = "black", linewidth = 1) +
+  scale_fill_manual(values = c("1850" = "darkolivegreen", "1911" = "dodgerblue4", "2011" = "firebrick"),
+                    labels = legend_labels) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +  # Adjust the breaks as needed
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white")
+  )
+################################################################################
+```

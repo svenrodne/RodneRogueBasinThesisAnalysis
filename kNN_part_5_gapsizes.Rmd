@@ -1,0 +1,757 @@
+---
+title: "gapsizestest"
+output: html_document
+date: "2025-10-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Clear the runway
+rm(list=ls())
+```
+
+Setting up the libraries
+
+```{r}
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(units)
+
+```
+
+
+Data source
+
+```{r}
+# Data source
+rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+rogue_ages <- rogue_ages %>%
+  mutate(diam_cm_1911 = diam_in_1911 * 2.54,
+         diam_cm_2011 = diam_in_2011 * 2.54)
+```
+
+Setting up the data
+
+```{r}
+
+# Adding in the disinct code to focus on just trees
+###### rodne_pid AA ############################################
+#rodne_pid 1911 aa dataframe
+aa_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+aa_rogue_ages_1911 <- aa_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(aa_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+aa_rogue_ages_1911 <- na.omit(aa_rogue_ages_1911)
+
+#rodne_pid 2011 aa dataframe
+aa_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+aa_rogue_ages_2011 <- aa_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(aa_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+aa_rogue_ages_2011 <- na.omit(aa_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_aa <- rbind(aa_rogue_ages_1911, aa_rogue_ages_2011)
+
+###### rodne_pid AB ############################################
+#rodne_pid 1911 ab dataframe
+ab_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ab_rogue_ages_1911 <- ab_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ab_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ab_rogue_ages_1911 <- na.omit(ab_rogue_ages_1911)
+
+#rodne_pid 2011 ab dataframe
+ab_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ab_rogue_ages_2011 <- ab_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ab_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ab_rogue_ages_2011 <- na.omit(ab_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ab <- rbind(ab_rogue_ages_1911, ab_rogue_ages_2011)
+
+###### rodne_pid AC ############################################
+#rodne_pid 1911 ac dataframe
+ac_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ac_rogue_ages_1911 <- ac_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ac_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ac_rogue_ages_1911 <- na.omit(ac_rogue_ages_1911)
+
+#rodne_pid 2011 ac dataframe
+ac_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ac_rogue_ages_2011 <- ac_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ac_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ac_rogue_ages_2011 <- na.omit(ac_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ac <- rbind(ac_rogue_ages_1911, ac_rogue_ages_2011)
+
+###### rodne_pid AD ############################################
+#rodne_pid 1911 ad dataframe
+ad_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ad_rogue_ages_1911 <- ad_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ad_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ad_rogue_ages_1911 <- na.omit(ad_rogue_ages_1911)
+
+#rodne_pid 2011 ad dataframe
+ad_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ad_rogue_ages_2011 <- ad_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ad_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ad_rogue_ages_2011 <- na.omit(ad_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ad <- rbind(ad_rogue_ages_1911, ad_rogue_ages_2011)
+
+###### rodne_pid BA ############################################
+#rodne_pid 1911 ba dataframe
+ba_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ba_rogue_ages_1911 <- ba_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ba_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ba_rogue_ages_1911 <- na.omit(ba_rogue_ages_1911)
+
+#rodne_pid 2011 ba dataframe
+ba_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ba_rogue_ages_2011 <- ba_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ba_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ba_rogue_ages_2011 <- na.omit(ba_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ba <- rbind(ba_rogue_ages_1911, ba_rogue_ages_2011)
+
+###### rodne_pid CA ############################################
+#rodne_pid 1911 ca dataframe
+ca_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ca_rogue_ages_1911 <- ca_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ca_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ca_rogue_ages_1911 <- na.omit(ca_rogue_ages_1911)
+
+#rodne_pid 2011 ca dataframe
+ca_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ca_rogue_ages_2011 <- ca_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ca_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ca_rogue_ages_2011 <- na.omit(ca_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ca <- rbind(ca_rogue_ages_1911, ca_rogue_ages_2011)
+
+###### rodne_pid MA ############################################
+#rodne_pid 1911 ma dataframe
+ma_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ma_rogue_ages_1911 <- ma_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ma_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ma_rogue_ages_1911 <- na.omit(ma_rogue_ages_1911)
+
+#rodne_pid 2011 ma dataframe
+ma_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ma_rogue_ages_2011 <- ma_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ma_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ma_rogue_ages_2011 <- na.omit(ma_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ma <- rbind(ma_rogue_ages_1911, ma_rogue_ages_2011)
+
+###### rodne_pid VA ############################################
+#rodne_pid 1911 va dataframe
+va_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+va_rogue_ages_1911 <- va_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(va_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+va_rogue_ages_1911 <- na.omit(va_rogue_ages_1911)
+
+#rodne_pid 2011 va dataframe
+va_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+va_rogue_ages_2011 <- va_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(va_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+va_rogue_ages_2011 <- na.omit(va_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_va <- rbind(va_rogue_ages_1911, va_rogue_ages_2011)
+```
+
+```{r clump-gap-analysis, message=TRUE, warning=FALSE}
+# --- UPDATED: Clump/Gap function with 3-ha dynamic plot boundary ---
+library(sf)
+library(dplyr)
+library(units)
+library(ggplot2)
+
+# constants
+THREE_HA <- 30000                 # m^2
+SIDE_3HA <- sqrt(THREE_HA)        # ~173.2051 m
+
+calculate_clumps_and_gaps <- function(tree_data,
+                                      plot_name,
+                                      buffer_dist = 5,
+                                      plot_area_m2 = THREE_HA,
+                                      user_plot_boundary = NULL,
+                                      crs = 32610) {
+  # Return NULL early for empty tree datasets
+  if (is.null(tree_data) || nrow(tree_data) == 0) {
+    message("No trees for: ", plot_name)
+    return(NULL)
+  }
+  
+  # Convert to sf (assume x,y in meters in given crs)
+  trees_sf <- st_as_sf(tree_data, coords = c("x", "y"), crs = crs, remove = FALSE)
+  
+  # Determine plot boundary:
+  # - If user provided polygon, use that
+  # - Else create a square centered on centroid of points with area = plot_area_m2
+  if (!is.null(user_plot_boundary)) {
+    plot_boundary <- st_transform(user_plot_boundary, crs)
+  } else {
+    centroid <- st_coordinates(st_centroid(st_union(trees_sf)))
+    side_len <- sqrt(plot_area_m2)
+    half <- side_len / 2
+    # create axis-aligned square centered on centroid
+    x0 <- centroid[1] - half
+    x1 <- centroid[1] + half
+    y0 <- centroid[2] - half
+    y1 <- centroid[2] + half
+    plot_boundary <- st_polygon(list(rbind(
+      c(x0, y0), c(x1, y0), c(x1, y1), c(x0, y1), c(x0, y0)
+    ))) %>% st_sfc(crs = crs)
+  }
+  
+  # Create buffers around trees (crown/influence)
+  trees_buffer <- st_buffer(trees_sf, dist = buffer_dist)
+  
+  # Merge overlapping buffers to form clumps
+  clumps_union <- st_union(st_combine(trees_buffer))
+  # ensure we have simple POLYGONs or MULTIPOLYGONs; extract POLYGONs if needed
+  clumps_polys <- tryCatch({
+    # if geometrycollection, extract polygon members
+    st_collection_extract(clumps_union, "POLYGON")
+  }, error = function(e) {
+    # fallback to casting (robust)
+    tryCatch(st_cast(clumps_union, "POLYGON"), error = function(e2) clumps_union)
+  })
+  
+  # If clumps_polys ends up empty geometry (e.g., no buffers), create empty sf
+  if (length(clumps_polys) == 0 || all(st_is_empty(clumps_polys))) {
+    clumps_polys <- st_sfc(crs = st_crs(trees_sf))
+  }
+  
+  # Intersect clumps with plot boundary so clumps don't extend outside the plot
+  # (use st_intersection). If clumps_polys is empty, result is empty sfc.
+  clumps_in_plot <- tryCatch({
+    st_intersection(clumps_polys, plot_boundary)
+  }, error = function(e) {
+    # if intersection fails, try st_intersection on union
+    st_intersection(st_make_valid(clumps_polys), st_make_valid(plot_boundary))
+  })
+  
+  # Compute clump areas robustly
+  if (length(clumps_in_plot) == 0 || all(st_is_empty(clumps_in_plot))) {
+    clump_df <- tibble::tibble(rodne_pid = plot_name, clump_id = integer(), clump_area_m2 = numeric())
+  } else {
+    # ensure single-part polygons
+    clump_parts <- st_cast(clumps_in_plot, "POLYGON", warn = FALSE)
+    clump_area <- st_area(clump_parts)
+    clump_df <- data.frame(
+      rodne_pid = plot_name,
+      clump_id = seq_along(clump_area),
+      clump_area_m2 = as.numeric(set_units(clump_area, "m^2")),
+      stringsAsFactors = FALSE
+    )
+    # keep sf geometry as attribute if user wants to export
+    clump_parts <- st_as_sf(data.frame(clump_df), geometry = clump_parts, crs = crs)
+  }
+  
+  # Calculate gaps: plot boundary minus clumps union
+  # If clumps_in_plot empty -> entire plot is single gap polygon
+  if (length(clumps_in_plot) == 0 || all(st_is_empty(clumps_in_plot))) {
+    gaps_polys <- st_geometry(plot_boundary)
+  } else {
+    gaps_polys <- st_difference(plot_boundary, st_union(clumps_in_plot))
+  }
+  
+  # If difference returns geometrycollection or MULTIPOLYGON, extract polygons
+  if (length(gaps_polys) == 0 || all(st_is_empty(gaps_polys))) {
+    gap_df <- tibble::tibble(rodne_pid = plot_name, gap_id = integer(), gap_area_m2 = numeric())
+    gaps_sf <- st_sfc(crs = crs)
+  } else {
+    gaps_parts <- st_collection_extract(gaps_polys, "POLYGON")
+    gap_area <- st_area(gaps_parts)
+    gap_df <- data.frame(
+      rodne_pid = plot_name,
+      gap_id = seq_along(gap_area),
+      gap_area_m2 = as.numeric(set_units(gap_area, "m^2")),
+      stringsAsFactors = FALSE
+    )
+    gaps_sf <- st_as_sf(data.frame(gap_df), geometry = gaps_parts, crs = crs)
+  }
+  
+  # Prepare clumps_sf if available
+  if (exists("clump_parts") && nrow(clump_parts) > 0) {
+    clumps_sf <- clump_parts
+  } else {
+    clumps_sf <- st_sfc(crs = crs)
+  }
+  
+  # Return list (dataframes + sf objects)
+  return(list(
+    clumps_df = clump_df,
+    gaps_df = gap_df,
+    clumps_sf = clumps_sf,
+    gaps_sf = gaps_sf,
+    plot_boundary = plot_boundary
+  ))
+}
+
+# ---------------------------
+# Example usage for single plot:
+# ---------------------------
+# res <- calculate_clumps_and_gaps(aa_rogue_ages_1911, "AA_1911", buffer_dist = 5)
+# res$clumps_df
+# res$gaps_df
+# (plot with ggplot)
+# ggplot() + geom_sf(data = res$plot_boundary, fill = NA) + geom_sf(data = res$gaps_sf, fill = "lightblue") + geom_sf(data = res$clumps_sf, fill = "forestgreen")
+```
+
+```{r}
+plot_list <- list(
+  AA = list(y1911 = aa_rogue_ages_1911, y2011 = aa_rogue_ages_2011),
+  AB = list(y1911 = ab_rogue_ages_1911, y2011 = ab_rogue_ages_2011),
+  AC = list(y1911 = ac_rogue_ages_1911, y2011 = ac_rogue_ages_2011),
+  AD = list(y1911 = ad_rogue_ages_1911, y2011 = ad_rogue_ages_2011),
+  BA = list(y1911 = ba_rogue_ages_1911, y2011 = ba_rogue_ages_2011),
+  CA = list(y1911 = ca_rogue_ages_1911, y2011 = ca_rogue_ages_2011),
+  MA = list(y1911 = ma_rogue_ages_1911, y2011 = ma_rogue_ages_2011),
+  VA = list(y1911 = va_rogue_ages_1911, y2011 = va_rogue_ages_2011)
+)
+
+results <- list()
+
+for(pid in names(plot_list)) {
+  results[[pid]] <- list()
+  for(yr in c("y1911", "y2011")) {
+    df <- plot_list[[pid]][[yr]]
+    label <- paste0(pid, "_", ifelse(yr=="y1911","1911","2011"))
+    res <- calculate_clumps_and_gaps(df, label, buffer_dist = 5)
+    results[[pid]][[label]] <- res
+  }
+}
+
+# --- Combine Clump and Gap Data Across All Plots ---
+all_clumps_1911 <- bind_rows(lapply(results, function(x) x$clumps_1911))
+all_clumps_2011 <- bind_rows(lapply(results, function(x) x$clumps_2011))
+all_gaps_1911   <- bind_rows(lapply(results, function(x) x$gaps_1911))
+all_gaps_2011   <- bind_rows(lapply(results, function(x) x$gaps_2011))
+
+# --- Summarize Mean Clump and Gap Area by Year and Plot ---
+summary_clumps <- bind_rows(
+  all_clumps_1911 %>% group_by(rodne_pid) %>% summarise(mean_clump_m2 = mean(clump_area_m2), year = 1911),
+  all_clumps_2011 %>% group_by(rodne_pid) %>% summarise(mean_clump_m2 = mean(clump_area_m2), year = 2011)
+)
+
+summary_gaps <- bind_rows(
+  all_gaps_1911 %>% group_by(rodne_pid) %>% summarise(mean_gap_m2 = mean(gap_area_m2), year = 1911),
+  all_gaps_2011 %>% group_by(rodne_pid) %>% summarise(mean_gap_m2 = mean(gap_area_m2), year = 2011)
+)
+
+# --- Export Shapefiles for Each Plot and Year ---
+output_dir <- "outputs/clump_gap_shapefiles"
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+
+for (plot_id in names(results)) {
+  # Clumps
+  st_write(results[[plot_id]]$clumps_sf_1911, paste0(output_dir, "/", plot_id, "_1911_clumps.shp"), delete_dsn = TRUE)
+  st_write(results[[plot_id]]$clumps_sf_2011, paste0(output_dir, "/", plot_id, "_2011_clumps.shp"), delete_dsn = TRUE)
+  # Gaps
+  st_write(results[[plot_id]]$gaps_sf_1911, paste0(output_dir, "/", plot_id, "_1911_gaps.shp"), delete_dsn = TRUE)
+  st_write(results[[plot_id]]$gaps_sf_2011, paste0(output_dir, "/", plot_id, "_2011_gaps.shp"), delete_dsn = TRUE)
+}
+
+# --- Optional Visualization (Example for One Plot) ---
+ggplot() +
+  geom_sf(data = results$AA$gaps_sf_1911, fill = "lightblue", alpha = 0.4) +
+  geom_sf(data = results$AA$clumps_sf_1911, fill = "forestgreen", alpha = 0.6) +
+  labs(title = "Plot AA — 1911 Clumps and Gaps") +
+  theme_minimal()
+
+# --- Print Summary Tables ---
+print(summary_clumps)
+print(summary_gaps)
+
+```
+
+# Second Option
+
+Reset the source and original filtering
+
+```{r}
+# Data source
+rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+rogue_ages <- rogue_ages %>%
+  mutate(diam_cm_1911 = diam_in_1911 * 2.54,
+         diam_cm_2011 = diam_in_2011 * 2.54)
+```
+
+Setting up the data
+
+```{r}
+
+# Adding in the disinct code to focus on just trees
+###### rodne_pid AA ############################################
+#rodne_pid 1911 aa dataframe
+aa_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+aa_rogue_ages_1911 <- aa_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(aa_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+aa_rogue_ages_1911 <- na.omit(aa_rogue_ages_1911)
+
+#rodne_pid 2011 aa dataframe
+aa_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+aa_rogue_ages_2011 <- aa_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(aa_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+aa_rogue_ages_2011 <- na.omit(aa_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_aa <- rbind(aa_rogue_ages_1911, aa_rogue_ages_2011)
+
+###### rodne_pid AB ############################################
+#rodne_pid 1911 ab dataframe
+ab_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ab_rogue_ages_1911 <- ab_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ab_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ab_rogue_ages_1911 <- na.omit(ab_rogue_ages_1911)
+
+#rodne_pid 2011 ab dataframe
+ab_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AB" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ab_rogue_ages_2011 <- ab_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ab_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ab_rogue_ages_2011 <- na.omit(ab_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ab <- rbind(ab_rogue_ages_1911, ab_rogue_ages_2011)
+
+###### rodne_pid AC ############################################
+#rodne_pid 1911 ac dataframe
+ac_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ac_rogue_ages_1911 <- ac_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ac_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ac_rogue_ages_1911 <- na.omit(ac_rogue_ages_1911)
+
+#rodne_pid 2011 ac dataframe
+ac_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AC" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ac_rogue_ages_2011 <- ac_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ac_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ac_rogue_ages_2011 <- na.omit(ac_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ac <- rbind(ac_rogue_ages_1911, ac_rogue_ages_2011)
+
+###### rodne_pid AD ############################################
+#rodne_pid 1911 ad dataframe
+ad_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ad_rogue_ages_1911 <- ad_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ad_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ad_rogue_ages_1911 <- na.omit(ad_rogue_ages_1911)
+
+#rodne_pid 2011 ad dataframe
+ad_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="AD" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ad_rogue_ages_2011 <- ad_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ad_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ad_rogue_ages_2011 <- na.omit(ad_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ad <- rbind(ad_rogue_ages_1911, ad_rogue_ages_2011)
+
+###### rodne_pid BA ############################################
+#rodne_pid 1911 ba dataframe
+ba_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ba_rogue_ages_1911 <- ba_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ba_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ba_rogue_ages_1911 <- na.omit(ba_rogue_ages_1911)
+
+#rodne_pid 2011 ba dataframe
+ba_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="BA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ba_rogue_ages_2011 <- ba_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ba_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ba_rogue_ages_2011 <- na.omit(ba_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ba <- rbind(ba_rogue_ages_1911, ba_rogue_ages_2011)
+
+###### rodne_pid CA ############################################
+#rodne_pid 1911 ca dataframe
+ca_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ca_rogue_ages_1911 <- ca_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ca_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ca_rogue_ages_1911 <- na.omit(ca_rogue_ages_1911)
+
+#rodne_pid 2011 ca dataframe
+ca_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="CA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ca_rogue_ages_2011 <- ca_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ca_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ca_rogue_ages_2011 <- na.omit(ca_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ca <- rbind(ca_rogue_ages_1911, ca_rogue_ages_2011)
+
+###### rodne_pid MA ############################################
+#rodne_pid 1911 ma dataframe
+ma_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ma_rogue_ages_1911 <- ma_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(ma_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ma_rogue_ages_1911 <- na.omit(ma_rogue_ages_1911)
+
+#rodne_pid 2011 ma dataframe
+ma_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="MA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+ma_rogue_ages_2011 <- ma_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(ma_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+ma_rogue_ages_2011 <- na.omit(ma_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_ma <- rbind(ma_rogue_ages_1911, ma_rogue_ages_2011)
+
+###### rodne_pid VA ############################################
+#rodne_pid 1911 va dataframe
+va_rogue_ages_1911 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_cm_1911>=25.4 & include_1911=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+va_rogue_ages_1911 <- va_rogue_ages_1911[,c("rodne_uid", "x", "y", "diam_cm_1911", "spcd")]  %>%
+  mutate(year = "1911")
+colnames(va_rogue_ages_1911) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+va_rogue_ages_1911 <- na.omit(va_rogue_ages_1911)
+
+#rodne_pid 2011 va dataframe
+va_rogue_ages_2011 <- rogue_ages %>%
+  filter(plot_type=="stem" & rodne_pid=="VA" & diam_cm_2011>=25.4 & include_2011=="YES") %>%
+  distinct(trid, .keep_all = TRUE)
+va_rogue_ages_2011 <- va_rogue_ages_2011[,c("rodne_uid", "x", "y", "diam_cm_2011", "spcd")]  %>%
+  mutate(year = "2011")
+colnames(va_rogue_ages_2011) <- c("rodne_uid", "x", "y", "dbh", "spcd", "year")
+va_rogue_ages_2011 <- na.omit(va_rogue_ages_2011)
+
+# Combine data for all years
+combined_data_va <- rbind(va_rogue_ages_1911, va_rogue_ages_2011)
+```
+
+Run the Gap estimator
+
+```{r}
+# ============================================================
+# Gap and Clump Size Workflow for All Stem Map Plots (1911–2011)
+# ============================================================
+
+# Load libraries
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(terra)
+library(tidyr)
+library(units)
+
+# Create a list of all combined plot data
+plot_datasets <- list(
+  AA = combined_data_aa,
+  AB = combined_data_ab,
+  AC = combined_data_ac,
+  AD = combined_data_ad,
+  BA = combined_data_ba,
+  CA = combined_data_ca,
+  MA = combined_data_ma,
+  VA = combined_data_va
+)
+
+# ------------------------------------------------------------
+# Helper functions
+# ------------------------------------------------------------
+
+create_plot_boundary <- function(df, buffer = 5) {
+  bbox <- st_bbox(df)
+  st_as_sfc(st_bbox(c(
+    xmin = bbox["xmin"] - buffer,
+    ymin = bbox["ymin"] - buffer,
+    xmax = bbox["xmax"] + buffer,
+    ymax = bbox["ymax"] + buffer
+  ), crs = st_crs(df)))
+}
+
+calculate_gaps <- function(plot_points, plot_boundary, buffer_radius = 2) {
+  tree_bufs <- st_buffer(plot_points, dist = buffer_radius)
+  occupied <- st_union(tree_bufs)
+  gaps <- st_difference(plot_boundary, occupied)
+  gaps_area <- st_area(gaps)
+  
+  data.frame(
+    mean_gap_size_m2 = mean(as.numeric(gaps_area), na.rm = TRUE),
+    median_gap_size_m2 = median(as.numeric(gaps_area), na.rm = TRUE),
+    total_gap_area_m2 = sum(as.numeric(gaps_area), na.rm = TRUE),
+    num_gaps = length(gaps_area)
+  )
+}
+
+calculate_clumps <- function(plot_points, buffer_radius = 2) {
+  tree_bufs <- st_buffer(plot_points, dist = buffer_radius)
+  clumps <- st_union(tree_bufs) %>% st_cast("POLYGON")
+  clump_area <- st_area(clumps)
+  
+  data.frame(
+    mean_clump_size_m2 = mean(as.numeric(clump_area), na.rm = TRUE),
+    median_clump_size_m2 = median(as.numeric(clump_area), na.rm = TRUE),
+    total_clump_area_m2 = sum(as.numeric(clump_area), na.rm = TRUE),
+    num_clumps = length(clump_area)
+  )
+}
+
+# ------------------------------------------------------------
+# Main workflow loop for each plot
+# ------------------------------------------------------------
+
+results_list <- list()
+
+for (plot_name in names(plot_datasets)) {
+  df <- plot_datasets[[plot_name]]
+  
+  # Skip if missing coordinates
+  if (nrow(df) == 0 || any(is.na(df$x) | is.na(df$y))) next
+  
+  # Convert to sf
+  df_sf <- st_as_sf(df, coords = c("x", "y"), crs = 32610) # Update CRS as needed
+  
+  # Create consistent plot boundary using both years
+  boundary <- create_plot_boundary(df_sf)
+  
+  # Calculate gaps and clumps per year
+  gap_res <- df_sf %>%
+    group_by(year) %>%
+    group_modify(~ calculate_gaps(.x, boundary)) %>%
+    mutate(plot_id = plot_name)
+  
+  clump_res <- df_sf %>%
+    group_by(year) %>%
+    group_modify(~ calculate_clumps(.x)) %>%
+    mutate(plot_id = plot_name)
+  
+  # Merge and store
+  combined <- left_join(gap_res, clump_res, by = c("plot_id", "year"))
+  results_list[[plot_name]] <- combined
+}
+
+# Combine all plot results into one dataframe
+final_results <- bind_rows(results_list)
+
+# ------------------------------------------------------------
+# Summarize percent changes between 1911 and 2011
+# ------------------------------------------------------------
+final_summary <- final_results %>%
+  pivot_wider(names_from = year, values_from = starts_with("mean_")) %>%
+  mutate(
+    gap_change_percent = ((mean_gap_size_m2_2011 - mean_gap_size_m2_1911) / mean_gap_size_m2_1911) * 100,
+    clump_change_percent = ((mean_clump_size_m2_2011 - mean_clump_size_m2_1911) / mean_clump_size_m2_1911) * 100
+  )
+
+print(final_summary)
+
+# ------------------------------------------------------------
+# Optional: Visualization for one plot
+# ------------------------------------------------------------
+plot_id_to_show <- "AA"  # change as needed
+
+trees_sf <- st_as_sf(plot_datasets[[plot_id_to_show]], coords = c("x", "y"), crs = 32610)
+boundary_plot <- create_plot_boundary(trees_sf)
+
+ggplot() +
+  geom_sf(data = boundary_plot, fill = "grey95", color = "black") +
+  geom_sf(data = trees_sf, aes(color = as.factor(year)), size = 1) +
+  facet_wrap(~year) +
+  scale_color_manual(values = c("1911" = "darkgreen", "2011" = "orange")) +
+  labs(
+    title = paste("Tree Locations for Plot", plot_id_to_show),
+    color = "Year"
+  ) +
+  theme_minimal()
+```
+

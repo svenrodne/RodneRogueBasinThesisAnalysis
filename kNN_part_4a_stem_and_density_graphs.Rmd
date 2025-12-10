@@ -1,0 +1,533 @@
+---
+title: "kNN_part_4_stem_and_density_graphs"
+author: "Sven Rodne"
+date: "2024-07-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Clear the runway
+rm(list=ls())
+```
+
+# Ready the libraries
+
+```{r, warning=FALSE}
+# Libraries
+library(Rmisc)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(tidyr)
+```
+
+# Prepping the density plot data for viewing
+
+```{r}
+# Bringing in the data
+rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+
+# Filter to density plots
+rogue_ages <- rogue_ages %>% filter(plot_type=="density")
+
+########### 2011
+#Filter to trees alive in 2011
+rogue_ages_2011 <- rogue_ages %>% filter(include_2011=="YES", diam_in_2011>=4)
+
+# Create column for conversion factor
+rogue_ages_2011$conv_factor <- ifelse(rogue_ages_2011$plot_size == "0.1", 10, .333333333)
+
+# Summarize density and basal area by plot and the individual recon_group (keep the site name and conversion factor with the group_by argument because we'll need them in the next step)
+# Stem Density
+stem_density_estimates_2011 <- rogue_ages_2011 %>%
+  group_by(pvt, site_name, rodne_pid, conv_factor) %>%
+  tally() %>%
+  mutate(stph = n * conv_factor,
+         stpa = stph * 0.404686) %>%
+  select(-n)
+
+# Tree Density
+tree_density_estimates_2011 <- rogue_ages_2011 %>%
+  distinct(pvt, site_name, rodne_pid, conv_factor, trid) %>%
+  group_by(pvt, site_name, rodne_pid, conv_factor) %>%
+  tally() %>%
+  mutate(tph = n * conv_factor,
+         tpa = tph * 0.404686) %>%
+  select(-n)
+
+# Basal Area
+basal_estimates_2011 <- rogue_ages_2011 %>% 
+  group_by(pvt, site_name, rodne_pid, conv_factor) %>%
+  dplyr::summarize(ba_2011_ft2 = sum(ba_2011_ft2)) %>%
+  mutate(baph = (ba_2011_ft2 * conv_factor) * 0.09290304, # This is changing from sq ft per hectare to sq m per hectare
+         bapa = baph * 4.356) %>% # Changing unit from sq m per hectare to sq ft per acre
+  select(-ba_2011_ft2)
+
+# Join the density and basal values
+estimates_2011 <- tree_density_estimates_2011 %>%
+  right_join(basal_estimates_2011, by = c("pvt", "site_name", "rodne_pid", "conv_factor")) %>%
+  right_join(stem_density_estimates_2011, by = c("pvt", "site_name", "rodne_pid", "conv_factor"))
+
+# All the calculations for averages and confidence intervals
+estimates_2011_site_cis <- estimates_2011 %>%
+  group_by(site_name) %>%
+  dplyr::summarise(mean_tpa = mean(tpa),
+            lci_tpa = CI(tpa)[3],
+            uci_tpa = CI(tpa)[1],
+            mean_tph = mean(tph),
+            lci_tph = CI(tph)[3],
+            uci_tph = CI(tph)[1],
+            mean_stpa = mean(stpa),
+            lci_stpa = CI(stpa)[3],
+            uci_stpa = CI(stpa)[1],
+            mean_stph = mean(stph),
+            lci_stph = CI(stph)[3],
+            uci_stph = CI(stph)[1],
+            mean_bapa = mean(bapa),
+            lci_bapa = CI(bapa)[3],
+            uci_bapa = CI(bapa)[1],
+            mean_baph = mean(baph),
+            lci_baph = CI(baph)[3],
+            uci_baph = CI(baph)[1]) %>%
+  mutate(recon_year = 2011)
+
+estimates_2011_mean_cis <- estimates_2011 %>%
+  summarise(mean_tpa = mean(tpa),
+            lci_tpa = CI(tpa)[3],
+            uci_tpa = CI(tpa)[1],
+            mean_tph = mean(tph),
+            lci_tph = CI(tph)[3],
+            uci_tph = CI(tph)[1],
+            mean_stpa = mean(stpa),
+            lci_stpa = CI(stpa)[3],
+            uci_stpa = CI(stpa)[1],
+            mean_stph = mean(stph),
+            lci_stph = CI(stph)[3],
+            uci_stph = CI(stph)[1],
+            mean_bapa = mean(bapa),
+            lci_bapa = CI(bapa)[3],
+            uci_bapa = CI(bapa)[1],
+            mean_baph = mean(baph),
+            lci_baph = CI(baph)[3],
+            uci_baph = CI(baph)[1]) %>%
+  mutate(recon_year = 2011)
+
+########## 1911
+
+# Filter to trees alive in 1911
+rogue_ages_1911 <- rogue_ages %>% 
+  filter(include_1911 == "YES", diam_in_1911 >= 4)
+
+# Create column for conversion factor
+rogue_ages_1911 <- rogue_ages_1911 %>%
+  mutate(conv_factor = ifelse(plot_size == "0.1", 10, 0.333333333))
+
+# Create a data frame with all unique `rodne_pid` values
+all_rodne_pids <- rogue_ages_2011 %>%
+  distinct(rodne_pid, pvt, site_name, conv_factor)
+
+# Summarize density by plot and recon_group
+# Stem Density
+stem_density_estimates_1911 <- rogue_ages_1911 %>%
+  group_by(site_name, pvt, rodne_pid, conv_factor) %>%
+  tally()
+
+# Tree Density
+tree_density_estimates_1911 <- rogue_ages_1911 %>%
+  distinct(pvt, site_name, rodne_pid, conv_factor, trid) %>%
+  group_by(pvt, site_name, rodne_pid, conv_factor) %>%
+  tally()
+
+# Basal Area
+basal_estimates_1911 <- rogue_ages_1911 %>% 
+  group_by(pvt, site_name, rodne_pid, conv_factor) %>%
+  dplyr::summarize(ba_1911_ft2 = sum(ba_1911_ft2))
+
+# Left join to include all rodne_pid values, even those with zero counts
+# Stem Density
+stem_density_estimates_1911 <- all_rodne_pids %>%
+  left_join(stem_density_estimates_1911, by = c("pvt", "site_name", "rodne_pid", "conv_factor")) %>%
+  mutate(n = ifelse(is.na(n), 0, n),  # Replace NA with 0 for rows with no counts
+         stph = n * conv_factor,
+         stpa = stph * 0.404686) %>%
+  select(-n)
+
+# Tree Density
+tree_density_estimates_1911 <- all_rodne_pids %>%
+  left_join(tree_density_estimates_1911, by = c("pvt", "site_name", "rodne_pid", "conv_factor")) %>%
+  mutate(n = ifelse(is.na(n), 0, n),  # Replace NA with 0 for rows with no counts
+         tph = n * conv_factor,
+         tpa = tph * 0.404686) %>%
+  select(-n)
+
+# Basal Area
+basal_estimates_1911 <- all_rodne_pids %>%
+  left_join(basal_estimates_1911, by = c("pvt", "site_name", "rodne_pid", "conv_factor")) %>%
+  mutate(baph = (ba_1911_ft2 * conv_factor) * 0.09290304, # This is changing from sq ft per hectare to sq m per hectare
+         bapa = baph * 4.356) %>% # Changing unit from sq m per hectare to sq ft per acre
+  select(-ba_1911_ft2)
+
+# Replace all NA values with 0 in the dataframe
+basal_estimates_1911[is.na(basal_estimates_1911)] <- 0
+
+# Join the density and basal values
+
+estimates_1911 <- tree_density_estimates_1911 %>%
+  right_join(basal_estimates_1911, by = c("pvt", "site_name", "rodne_pid", "conv_factor")) %>%
+  right_join(stem_density_estimates_1911, by = c("pvt", "site_name", "rodne_pid", "conv_factor"))
+
+# Calculate mean density per site
+
+estimates_1911_site_cis <- estimates_1911 %>%
+  group_by(site_name) %>%
+  dplyr::summarise(mean_tpa = mean(tpa),
+            lci_tpa = CI(tpa)[3],
+            uci_tpa = CI(tpa)[1],
+            mean_tph = mean(tph),
+            lci_tph = CI(tph)[3],
+            uci_tph = CI(tph)[1],
+            mean_stpa = mean(stpa),
+            lci_stpa = CI(stpa)[3],
+            uci_stpa = CI(stpa)[1],
+            mean_stph = mean(stph),
+            lci_stph = CI(stph)[3],
+            uci_stph = CI(stph)[1],
+            mean_bapa = mean(bapa),
+            lci_bapa = CI(bapa)[3],
+            uci_bapa = CI(bapa)[1],
+            mean_baph = mean(baph),
+            lci_baph = CI(baph)[3],
+            uci_baph = CI(baph)[1]) %>%
+  mutate(recon_year = 1911)
+
+# Calculating all of the Rogue Summaries
+estimates_1911_mean_cis <- estimates_1911 %>% 
+  dplyr::summarise(mean_tpa = mean(tpa),
+            lci_tpa = CI(tpa)[3],
+            uci_tpa = CI(tpa)[1],
+            mean_tph = mean(tph),
+            lci_tph = CI(tph)[3],
+            uci_tph = CI(tph)[1],
+            mean_stpa = mean(stpa),
+            lci_stpa = CI(stpa)[3],
+            uci_stpa = CI(stpa)[1],
+            mean_stph = mean(stph),
+            lci_stph = CI(stph)[3],
+            uci_stph = CI(stph)[1],
+            mean_bapa = mean(bapa),
+            lci_bapa = CI(bapa)[3],
+            uci_bapa = CI(bapa)[1],
+            mean_baph = mean(baph),
+            lci_baph = CI(baph)[3],
+            uci_baph = CI(baph)[1]) %>%
+  mutate(recon_year = 1911)
+
+# Making the plot level combined dataframes
+
+plot_estimates_1911 <- estimates_1911 %>%
+  mutate(recon_year = 1911) %>%
+  select(-conv_factor)
+
+plot_estimates_2011 <- estimates_2011 %>%
+  mutate(recon_year = 2011) %>%
+  select(-conv_factor)
+
+############ Merge all the years
+
+# Putting the tree lists from the two time periods together
+all_density_estimates <-do.call("rbind", list(estimates_2011_site_cis, estimates_1911_site_cis))
+
+# Change recon year to factor and view new data...
+all_density_estimates$recon_year <- as.factor(all_density_estimates$recon_year)
+
+# Putting the tree lists from the two time periods together
+all_plot_density_estimates <-union(plot_estimates_1911, plot_estimates_2011)
+
+# Change recon year to factor and view new data...
+all_plot_density_estimates$recon_year <- as.factor(all_plot_density_estimates$recon_year)
+
+# Summarize the data
+
+cat("\n----- Summary for 1911: tpa -----\n")
+summary(estimates_1911$tpa)
+c(Mean = mean(estimates_1911$tpa), CI(estimates_1911$tpa)[3], CI(estimates_1911$tpa)[1])
+cat("\n----- Summary for 2011: tpa -----\n")
+summary(estimates_2011$tpa)
+c(Mean = mean(estimates_2011$tpa), CI(estimates_2011$tpa)[3], CI(estimates_2011$tpa)[1])
+
+cat("\n----- Summary for 1911: bapa -----\n")
+summary(estimates_1911$bapa)
+c(Mean = mean(estimates_1911$bapa), CI(estimates_1911$bapa)[3], CI(estimates_1911$bapa)[1])
+cat("\n----- Summary for 2011: bapa -----\n")
+summary(estimates_2011$bapa)
+c(Mean = mean(estimates_2011$bapa), CI(estimates_2011$bapa)[3], CI(estimates_2011$bapa)[1])
+
+cat("\n----- Summary for 1911: tph -----\n")
+summary(estimates_1911$tph)
+c(Mean = mean(estimates_1911$tph), CI(estimates_1911$tph)[3], CI(estimates_1911$tph)[1])
+cat("\n----- Summary for 2011: tph -----\n")
+summary(estimates_2011$tph)
+c(Mean = mean(estimates_2011$tph), CI(estimates_2011$tph)[3], CI(estimates_2011$tph)[1])
+
+cat("\n----- Summary for 1911: baph -----\n")
+summary(estimates_1911$baph)
+c(Mean = mean(estimates_1911$baph), CI(estimates_1911$baph)[3], CI(estimates_1911$baph)[1])
+cat("\n----- Summary for 2011: baph -----\n")
+summary(estimates_2011$baph)
+c(Mean = mean(estimates_2011$baph), CI(estimates_2011$baph)[3], CI(estimates_2011$baph)[1])
+
+```
+To plot the boxplots
+
+
+```{r}
+# Metric
+# Trees per hectare
+metric_tree_density_boxplot <- ggplot(all_plot_density_estimates, aes(x = site_name, y = tph, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Trees per Hectare") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Trees per Hectare per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+metric_tree_density_boxplot
+ggsave("Graphics/metric_tree_density_boxplot.png", plot = metric_tree_density_boxplot, width = 10, height = 6, dpi = 300)
+
+# Stems per hectare
+metric_stem_density_boxplot <- ggplot(all_plot_density_estimates, aes(x = site_name, y = stph, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Stems per Hectare") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Stems per Hectare per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+metric_stem_density_boxplot
+ggsave("Graphics/metric_stem_density_boxplot.png", plot = metric_stem_density_boxplot, width = 10, height = 6, dpi = 300)
+
+# Basal area per hectare
+metric_basal_density_boxplot <- ggplot(all_plot_density_estimates, aes(x = site_name, y = baph, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Square Meters per Hectare") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Basal Area per Hectare per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+metric_basal_density_boxplot
+ggsave("Graphics/metric_basal_density_boxplot.png", plot = metric_basal_density_boxplot, width = 10, height = 6, dpi = 300)
+
+# Imperial
+# Trees per acre
+imperial_tree_density_boxplot <- ggplot(all_plot_density_estimates, aes(x = site_name, y = tpa, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Trees per Acre") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Trees per Acre per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+imperial_tree_density_boxplot
+ggsave("Graphics/imperial_tree_density_boxplot.png", plot = imperial_tree_density_boxplot, width = 10, height = 6, dpi = 300)
+
+# Stems per acre
+imperial_stem_density_boxplot <- ggplot(all_plot_density_estimates, aes(x = site_name, y = stpa, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Stems per Acre") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Stems per Acre per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+imperial_stem_density_boxplot
+ggsave("Graphics/imperial_stem_density_boxplot.png", plot = imperial_stem_density_boxplot, width = 10, height = 6, dpi = 300)
+
+# Basal area per acre
+imperial_basal_density_boxplot <- ggplot(all_plot_density_estimates, aes(x = site_name, y = bapa, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Square Feet per Acre") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Basal Area per Acre per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+imperial_basal_density_boxplot
+ggsave("Graphics/imperial_basal_density_boxplot.png", plot = imperial_basal_density_boxplot, width = 10, height = 6, dpi = 300)
+```
+
+# Density plots results by PVT
+
+```{r}
+# Ready the PVT data for results
+
+# Filter out ponderosa and jeffrey pine
+rogue_pvt <- all_plot_density_estimates %>% 
+  filter(!pvt %in% c("Ponderosa pine - Dry", "Jeffrey pine"))
+```
+
+# Boxplots
+
+```{r}
+# Metric
+# Trees per hectare
+pvt_metric_tree_density_boxplot <- ggplot(rogue_pvt, aes(x = pvt, y = tph, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Trees per Hectare") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Trees per Hectare per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+pvt_metric_tree_density_boxplot
+ggsave("Graphics/pvt_metric_tree_density_boxplot.png", plot = pvt_metric_tree_density_boxplot, width = 10, height = 6, dpi = 300)
+
+# Stems per hectare
+pvt_metric_stem_density_boxplot <- ggplot(rogue_pvt, aes(x = pvt, y = stph, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Stems per Hectare") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Stems per Hectare per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+pvt_metric_stem_density_boxplot
+ggsave("Graphics/pvt_metric_stem_density_boxplot.png", plot = pvt_metric_stem_density_boxplot, width = 10, height = 6, dpi = 300)
+
+# Basal area per hectare
+pvt_metric_basal_density_boxplot <- ggplot(rogue_pvt, aes(x = pvt, y = baph, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Square Meters per Hectare") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Basal Area per Hectare per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+pvt_metric_basal_density_boxplot
+ggsave("Graphics/pvt_metric_basal_density_boxplot.png", plot = pvt_metric_basal_density_boxplot, width = 10, height = 6, dpi = 300)
+
+# Imperial
+# Trees per acre
+pvt_imperial_tree_density_boxplot <- ggplot(rogue_pvt, aes(x = pvt, y = tpa, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Trees per Acre") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Trees per Acre per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+pvt_imperial_tree_density_boxplot
+ggsave("Graphics/pvt_imperial_tree_density_boxplot.png", plot = pvt_imperial_tree_density_boxplot, width = 10, height = 6, dpi = 300)
+
+# Stems per acre
+pvt_imperial_stem_density_boxplot <- ggplot(rogue_pvt, aes(x = pvt, y = stpa, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Stems per Acre") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Stems per Acre per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+pvt_imperial_stem_density_boxplot
+ggsave("Graphics/pvt_imperial_stem_density_boxplot.png", plot = pvt_imperial_stem_density_boxplot, width = 10, height = 6, dpi = 300)
+
+# Basal area per acre
+pvt_imperial_basal_density_boxplot <- ggplot(rogue_pvt, aes(x = pvt, y = bapa, fill = recon_year)) +
+  geom_boxplot(position = position_dodge(width = 0.8),
+               outlier.shape = 21, outlier.alpha = 0.7,
+               width = 0.6, linewidth = 0.4) +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Square Feet per Acre") +
+  scale_x_discrete("Site") +
+  labs(title = "Distribution of Basal Area per Acre per Site (1911 vs. 2011)") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.1, 0.8),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill = guide_legend(title = "Year"))
+
+pvt_imperial_basal_density_boxplot
+ggsave("Graphics/pvt_imperial_basal_density_boxplot.png", plot = pvt_imperial_basal_density_boxplot, width = 10, height = 6, dpi = 300)
+```

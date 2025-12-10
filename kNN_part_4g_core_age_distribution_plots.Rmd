@@ -1,0 +1,127 @@
+---
+title: "kNN_part_4g_core_distribution_charts"
+author: "Sven Rodne"
+date: "2025-11-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Library
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpattern)
+detach("package:Rmisc", unload = TRUE)
+detach("package:plyr", unload = TRUE)
+```
+
+```{r}
+# Bringing in the data
+rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+table(rogue_ages$spcd)
+sort(table(rogue_ages$spcd), decreasing = TRUE)
+```
+
+Attempting to create a graph showing min and max ages for all 17 species
+
+```{r}
+# rogue_limit is the rogue_ages dataframe with only live trees
+rogue_limit <- rogue_ages %>%
+  filter(!is.na(pith)) %>%
+  filter(cond=="LIVE")
+
+# Summarize min/max years and count for each species
+species_range <- rogue_limit %>%
+  group_by(spcd) %>%
+  summarize(
+    min_year = min(pith, na.rm = TRUE),
+    max_year = max(end_year, na.rm = TRUE),
+    count = n()  # Count of live trees per species
+  ) %>%
+  ungroup() %>%
+  # Create species label with count
+  mutate(spcd_label = paste0(spcd, " (n=", count, ")"))
+
+# Create the plot
+ggplot(species_range, aes(y = reorder(spcd_label, -min_year), xmin = min_year, xmax = max_year)) +
+  geom_linerange(aes(xmin = min_year, xmax = max_year), linewidth = 1.5, color = "blue") +
+  geom_point(aes(x = min_year), size = 3, color = "red") +  # Start year
+  geom_point(aes(x = max_year), size = 3, color = "black") +  # End year
+  labs(title = "Min and Max Years for Tree Species",
+       x = "Year",
+       y = "Species (n)") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10))
+```
+
+Making the pith year distributions plot that shows each cored species
+
+```{r}
+# Filter live trees
+rogue_limit <- rogue_ages %>%
+  filter(!is.na(pith)) %>%
+  filter(cond=="LIVE")
+
+# Count number of trees per species
+species_count <- rogue_limit %>%
+  group_by(spcd) %>%
+  summarise(count = n()) %>%
+  filter(count >= 50)  # Remove species with fewer than 15 samples
+
+# Merge species count into main data
+rogue_limit <- rogue_limit %>%
+  inner_join(species_count, by = "spcd") %>%  # Keep only species with count >= 15
+  mutate(spcd_label = paste0(spcd, " (n=", count, ")"))
+
+# Create boxplot with flipped axes
+ggplot(rogue_limit, aes(y = reorder(spcd_label, pith, FUN = median), x = pith)) +
+  geom_boxplot(fill = "lightblue", color = "black", outlier.shape = NA) +  # Boxplot without outliers
+  geom_jitter(height = 0.2, size = 1, alpha = 0.5, color = "red") +  # Add jittered points for visibility
+  labs(title = "Distribution of Pith Years by Species",
+       y = "Species (n)",
+       x = "Pith Year") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10))
+
+```
+
+Attempting to change the size of the dot to correspond to the diameter of the tree
+
+```{r}
+# Filter live trees
+rogue_limit <- rogue_ages %>%
+  filter(!is.na(pith)) %>%
+  filter(cond=="LIVE") %>%
+  mutate(true_age = end_year - pith)
+
+# Count number of trees per species
+species_count <- rogue_limit %>%
+  group_by(spcd) %>%
+  summarise(count = n()) %>%
+  filter(count >= 50)  # Remove species with fewer than 50 samples
+
+# Merge species count into main data
+rogue_limit <- rogue_limit %>%
+  inner_join(species_count, by = "spcd") %>%
+  mutate(spcd_label = paste0(spcd, " (n=", count, ")"))
+
+# Create boxplot with flipped axes
+ggplot(rogue_limit, aes(y = reorder(spcd_label, true_age, FUN = median), x = true_age)) +
+  geom_boxplot(fill = "lightblue", color = "black", outlier.shape = NA) +  # Boxplot without outliers
+  geom_jitter(aes(color = diam_cm), height = 0.2, size = 1.5, alpha = 0.7) +  # Jittered points with color based on diameter
+  scale_color_gradient(low = "orange", high = "darkblue", name = "Tree Diameter (cm)") +  # Color gradient from red (small) to blue (large)
+  labs(title = "Cored Tree Distribution of Ages by Species",
+       y = "Species (n)",
+       x = "Age") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10))
+
+```

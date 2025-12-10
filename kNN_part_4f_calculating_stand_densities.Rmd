@@ -1,0 +1,539 @@
+---
+title: "kNN_part_4f_stand_density_calculations"
+author: "Sven Rodne"
+date: "2024-10-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Clear the runway
+
+```{r}
+# Clear environment
+rm(list=ls())
+```
+
+# Ready the libraries
+
+```{r, warning=FALSE}
+# Libraries
+library(dplyr)
+library(ggplot2)
+detach("package:Rmisc", unload = TRUE)
+detach("package:plyr", unload = TRUE)
+```
+
+# Summation calculation explanation
+
+```{r}
+# Summation calculation
+# SDI = (Di/10)^1.6
+```
+
+The summation calculation is the sum of all individually calculated tree diameters that creates the calculated stand density index. This value is then divided by the plot plant association max sdi to calculate the rdi.
+
+# Make sure that plyr isn't on!
+
+```{r}
+# Bringing in the data
+rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+
+# Filter to density plots
+rogue_ages <- rogue_ages %>% filter(plot_type=="density")
+
+########## 2011
+# Filter and calculate conversion factor and indsdi
+rogue_ages_2011 <- rogue_ages %>%
+  filter(include_2011 == "YES", diam_in_2011 >= 4) %>%
+  mutate(conv_factor = ifelse(plot_size == "0.1", 10, 0.333333333),
+         indsdi = ((diam_in_2011 / 10)^1.6)) 
+
+# Compute sum of indsdi per plot and store in a separate dataframe
+plot_sums <- rogue_ages_2011 %>%
+  group_by(rodne_pid) %>%
+  summarize(plotdi = sum(indsdi, na.rm = TRUE)) %>%
+  ungroup()
+
+# Merge back to the original filtered dataset
+rogue_ages_2011 <- rogue_ages_2011 %>%
+  left_join(plot_sums, by = "rodne_pid")
+
+# Convert for SDI
+rogue_ages_2011 <- rogue_ages_2011 %>%
+  mutate(h_sdi = plotdi * conv_factor,
+            sdi = h_sdi * 0.404686)
+
+summary(rogue_ages_2011$plotdi)
+
+# Summarize stem density and SDI for 2011
+# Summarize density and basal area by plot and the individual recon_group (keep the site name and conversion factor with the group_by argument because we'll need them in the next step)
+# Stem Density
+stem_density_estimates_2011 <- rogue_ages_2011 %>%
+  group_by(site_name, rodne_pid, conv_factor, sdi) %>%
+  tally() %>%
+  mutate(stph = n * conv_factor,
+         stpa = stph * 0.404686) %>%
+  select("stph", "stpa", "sdi")
+
+# Tree Density
+tree_density_estimates_2011 <- rogue_ages_2011 %>%
+  distinct(site_name, rodne_pid, conv_factor, trid) %>%  # Keep only unique rodne_uid rows
+  group_by(site_name, rodne_pid, conv_factor) %>%
+  tally() %>%
+  mutate(tph = n * conv_factor,
+         tpa = tph * 0.404686) %>%
+  select("conv_factor", "tph", "tpa")
+
+# Basal Area
+basal_estimates_2011 <- rogue_ages_2011 %>% 
+  group_by(site_name, rodne_pid, conv_factor) %>%
+  dplyr::summarize(ba_2011_ft2 = sum(ba_2011_ft2)) %>%
+  mutate(baph = (ba_2011_ft2 * conv_factor) * 0.09290304, # This is changing from sq ft per hectare to sq m per hectare
+         bapa = baph * 4.356) %>% # Changing the sq m/hectare unit to sq ft/acre
+  select("conv_factor", "baph", "bapa")
+
+# Join the density and basal values
+estimates_2011 <- tree_density_estimates_2011 %>%
+  right_join(basal_estimates_2011, by = c("site_name", "rodne_pid", "conv_factor")) %>%
+  right_join(stem_density_estimates_2011, by = c("site_name", "rodne_pid", "conv_factor"))
+
+# Create the dataframe to plot
+plot_estimates_2011 <- estimates_2011 %>%
+  mutate(recon_year = 2011) %>%
+  select(-conv_factor)
+
+# Change the column names to reflect the year
+estimates_2011 <- estimates_2011 %>%
+  rename(tph_2011 = tph,
+         tpa_2011 = tpa,
+         baph_2011 = baph,
+         bapa_2011 = bapa,
+         stph_2011 = stph,
+         stpa_2011 = stpa,
+         sdi_2011 = sdi) %>%
+  select(-conv_factor)
+
+########## 1911
+
+# Filter and calculate conversion factor and indsdi
+rogue_ages_1911 <- rogue_ages %>%
+  filter(include_1911 == "YES", diam_in_1911 >= 4) %>%
+  mutate(conv_factor = ifelse(plot_size == "0.1", 10, .333333333),
+         indsdi = ((diam_in_1911 / 10)^1.6))
+
+rogue_ages_1911 <- rogue_ages_1911 %>%
+  group_by(rodne_pid) %>%
+  mutate(plotdi = sum(indsdi),
+         h_sdi = plotdi * conv_factor,
+         sdi = h_sdi * 0.404686)
+
+summary(rogue_ages_1911$plotdi)
+
+# Create a data frame with all unique `rodne_pid` values
+all_rodne_pids <- rogue_ages_2011 %>%
+  distinct(rodne_pid, site_name, conv_factor)
+
+# Summarize density by plot and recon_group
+# Stem Density
+stem_density_estimates_1911 <- rogue_ages_1911 %>%
+  group_by(site_name, rodne_pid, conv_factor, sdi) %>%
+  tally()
+
+# Tree Density
+tree_density_estimates_1911 <- rogue_ages_1911 %>%
+  distinct(site_name, rodne_pid, conv_factor, trid) %>%
+  group_by(site_name, rodne_pid, conv_factor) %>%
+  tally()
+
+# Basal Area
+basal_estimates_1911 <- rogue_ages_1911 %>% 
+  group_by(site_name, rodne_pid, conv_factor) %>%
+  dplyr::summarize(ba_1911_ft2 = sum(ba_1911_ft2))
+
+# Left join to include all rodne_pid values, even those with zero counts
+# Stem Density
+stem_density_estimates_1911 <- all_rodne_pids %>%
+  left_join(stem_density_estimates_1911, by = c("site_name", "rodne_pid", "conv_factor")) %>%
+  mutate(n = ifelse(is.na(n), 0, n),  # Replace NA with 0 for rows with no counts
+         stph = n * conv_factor,
+         stpa = stph * 0.404686) %>%
+  select(-n)
+
+# Tree Density
+tree_density_estimates_1911 <- all_rodne_pids %>%
+  left_join(tree_density_estimates_1911, by = c("site_name", "rodne_pid", "conv_factor")) %>%
+  mutate(n = ifelse(is.na(n), 0, n),  # Replace NA with 0 for rows with no counts
+         tph = n * conv_factor,
+         tpa = tph * 0.404686) %>%
+  select(-n)
+
+# Basal Area
+basal_estimates_1911 <- all_rodne_pids %>%
+  left_join(basal_estimates_1911, by = c("site_name", "rodne_pid", "conv_factor")) %>%
+  mutate(baph = (ba_1911_ft2 * conv_factor) * 0.09290304, # This is changing from sq ft per hectare to sq m per hectare
+         bapa = baph * 4.356) # Changing the sq m/hectare unit to sq ft/acre
+
+# Replace all NA values with 0 in the dataframe
+basal_estimates_1911[is.na(basal_estimates_1911)] <- 0
+
+# Join the density and basal values
+estimates_1911 <- tree_density_estimates_1911 %>%
+  right_join(basal_estimates_1911, by = c("site_name", "rodne_pid", "conv_factor")) %>%
+  right_join(stem_density_estimates_1911, by = c("site_name", "rodne_pid", "conv_factor"))
+
+# Create the dataframe to plot
+plot_estimates_1911 <- estimates_1911 %>%
+  mutate(recon_year = 1911) %>%
+  select(-conv_factor)
+
+# Change the column names to reflect the year
+estimates_1911 <- estimates_1911 %>%
+  rename(tph_1911 = tph,
+         tpa_1911 = tpa,
+         baph_1911 = baph,
+         bapa_1911 = bapa,
+         stph_1911 = stph,
+         stpa_1911 = stpa,
+         sdi_1911 = sdi) %>%
+  select(-conv_factor)
+```
+
+# Adding the max sdi values to calculate the rdi values
+
+```{r}
+############ Merge all the years
+# Merge estimates_2011 and estimates_1911
+final_merged_estimates <- merge(estimates_2011, estimates_1911, by = c("site_name", "rodne_pid"), all = TRUE)
+
+# Replace all NA values with 0 in the dataframe
+final_merged_estimates[is.na(final_merged_estimates)] <- 0
+
+# Bring in the max sdi values
+bpsass <- read.csv("csv_input_deck/plot_dates_plant_assoc_pvt_bps.csv")
+
+# Create the per acre sdi csv for each plot
+bpsass_max <- bpsass %>%
+  select("rodne_pid", "max_sdi", "field_pvt", "field_plant_assoc")
+
+final_merged_estimates <- final_merged_estimates %>%
+  inner_join(bpsass_max, by = "rodne_pid")
+
+final_merged_estimates <- final_merged_estimates %>%
+  mutate(rdi_1911 = sdi_1911/max_sdi,
+         rdi_2011 = sdi_2011/max_sdi)
+
+summary(final_merged_estimates$rdi_1911)
+summary(final_merged_estimates$rdi_2011)
+
+sdi_rdi_comps <- final_merged_estimates %>%
+  select(site_name, rodne_pid, field_pvt, field_plant_assoc, sdi_1911, sdi_2011, max_sdi, rdi_1911, rdi_2011)
+
+sdi_rdi_comps$rdi_diff <- sdi_rdi_comps$rdi_2011 - sdi_rdi_comps$rdi_1911
+sdi_rdi_comps$sdi_diff <- sdi_rdi_comps$sdi_2011 - sdi_rdi_comps$sdi_1911
+
+sd(sdi_rdi_comps$rdi_1911, na.rm = TRUE)
+sd(sdi_rdi_comps$rdi_2011, na.rm = TRUE)
+
+# Write the csv sdi_rdi_comps.csv
+write.csv(sdi_rdi_comps, "csv_output_deck/sdi_rdi_comps.csv", row.names = FALSE)
+```
+
+```{r}
+library(Rmisc)
+# Summary of averages and 95% CIs
+rogue_rdi <- sdi_rdi_comps %>%
+  summarise(mean_rdi_1911 = mean(rdi_1911),
+            lci_rdi_1911 = CI(rdi_1911)[3],
+            uci_rdi_1911 = CI(rdi_1911)[1],
+            mean_rdi_2011 = mean(rdi_2011),
+            lci_rdi_2011 = CI(rdi_2011)[3],
+            uci_rdi_2011 = CI(rdi_2011)[1])
+
+# Summary of averages and 95% CIs
+rogue_sdi <- sdi_rdi_comps %>%
+  summarise(mean_sdi_1911 = mean(sdi_1911),
+            lci_sdi_1911 = CI(sdi_1911)[3],
+            uci_sdi_1911 = CI(sdi_1911)[1],
+            mean_sdi_2011 = mean(sdi_2011),
+            lci_sdi_2011 = CI(sdi_2011)[3],
+            uci_sdi_2011 = CI(sdi_2011)[1])
+```
+
+Generating the site summaries for TPH, BaPH, SDI, RDI, and QMD
+
+```{r}
+# Merge estimates_2011 and estimates_1911
+final_merged_estimates <- merge(estimates_2011, estimates_1911, by = c("site_name", "rodne_pid"), all = TRUE)
+
+# Replace all NA values with 0 in the dataframe
+final_merged_estimates[is.na(final_merged_estimates)] <- 0
+
+# Bring in the max sdi values
+bpsass <- read.csv("csv_input_deck/plot_dates_plant_assoc_pvt_bps.csv")
+
+# Create the per acre sdi csv for each plot
+bpsass_max <- bpsass %>%
+  select("rodne_pid", "max_sdi", "field_pvt", "field_plant_assoc")
+
+final_merged_estimates <- final_merged_estimates %>%
+  inner_join(bpsass_max, by = "rodne_pid")
+
+final_merged_estimates <- final_merged_estimates %>%
+  mutate(rdi_1911 = sdi_1911/max_sdi,
+         rdi_2011 = sdi_2011/max_sdi,
+         qmd_1911 = sqrt((baph_1911 / tph_1911) / 0.00007854),
+         qmd_2011 = sqrt((baph_2011 / tph_2011) / 0.00007854))
+
+site_summaries <- final_merged_estimates %>%
+  select(site_name, rodne_pid, tph_1911, tph_2011, baph_1911, baph_2011, sdi_1911, sdi_2011, rdi_1911, rdi_2011, qmd_1911, qmd_2011) %>%
+  group_by(site_name) %>%
+  summarise(
+    TPH = sprintf("%.1f (%.1f)", mean(tph_1911, na.rm = TRUE), sd(tph_1911, na.rm = TRUE)),
+    tph_2011 = sprintf("%.1f (%.1f)", mean(tph_2011, na.rm = TRUE), sd(tph_2011, na.rm = TRUE)),
+    Baph = sprintf("%.1f (%.1f)", mean(baph_1911, na.rm = TRUE), sd(baph_1911, na.rm = TRUE)),
+    baph_2011 = sprintf("%.1f (%.1f)", mean(baph_2011, na.rm = TRUE), sd(baph_2011, na.rm = TRUE)),
+    SDI = sprintf("%.1f (%.1f)", mean(sdi_1911, na.rm = TRUE), sd(sdi_1911, na.rm = TRUE)),
+    sdi_2011 = sprintf("%.1f (%.1f)", mean(sdi_2011, na.rm = TRUE), sd(sdi_2011, na.rm = TRUE)),
+    RDI = sprintf("%.2f (%.2f)", mean(rdi_1911, na.rm = TRUE), sd(rdi_1911, na.rm = TRUE)),
+    rdi_2011 = sprintf("%.2f (%.2f)", mean(rdi_2011, na.rm = TRUE), sd(rdi_2011, na.rm = TRUE)),
+    QMD = sprintf("%.1f (%.1f)", mean(qmd_1911, na.rm = TRUE), sd(qmd_1911, na.rm = TRUE)),
+    qmd_2011 = sprintf("%.1f (%.1f)", mean(qmd_2011, na.rm = TRUE), sd(qmd_2011, na.rm = TRUE)))
+
+# Write the csv site_summaries.csv
+write.csv(site_summaries, "csv_output_deck/site_summaries.csv", row.names = FALSE)
+
+# Create the PVT summaries
+pvt_summaries <- final_merged_estimates %>%
+  select(field_pvt, rodne_pid, tph_1911, tph_2011, baph_1911, baph_2011, sdi_1911, sdi_2011, rdi_1911, rdi_2011, qmd_1911, qmd_2011) %>%
+  filter(!field_pvt %in% c("Jeffrey pine", "Ponderosa pine - Dry")) %>%
+  group_by(field_pvt) %>%
+  summarise(
+    tph_1911 = sprintf("%.1f (%.1f)", mean(tph_1911, na.rm = TRUE), sd(tph_1911, na.rm = TRUE)),
+    tph_2011 = sprintf("%.1f (%.1f)", mean(tph_2011, na.rm = TRUE), sd(tph_2011, na.rm = TRUE)),
+    baph_1911 = sprintf("%.1f (%.1f)", mean(baph_1911, na.rm = TRUE), sd(baph_1911, na.rm = TRUE)),
+    baph_2011 = sprintf("%.1f (%.1f)", mean(baph_2011, na.rm = TRUE), sd(baph_2011, na.rm = TRUE)),
+    sdi_1911 = sprintf("%.1f (%.1f)", mean(sdi_1911, na.rm = TRUE), sd(sdi_1911, na.rm = TRUE)),
+    sdi_2011 = sprintf("%.1f (%.1f)", mean(sdi_2011, na.rm = TRUE), sd(sdi_2011, na.rm = TRUE)),
+    rdi_1911 = sprintf("%.2f (%.2f)", mean(rdi_1911, na.rm = TRUE), sd(rdi_1911, na.rm = TRUE)),
+    rdi_2011 = sprintf("%.2f (%.2f)", mean(rdi_2011, na.rm = TRUE), sd(rdi_2011, na.rm = TRUE)),
+    qmd_1911 = sprintf("%.1f (%.1f)", mean(qmd_1911, na.rm = TRUE), sd(qmd_1911, na.rm = TRUE)),
+    qmd_2011 = sprintf("%.1f (%.1f)", mean(qmd_2011, na.rm = TRUE), sd(qmd_2011, na.rm = TRUE)))
+
+# Write the csv site_summaries.csv
+write.csv(pvt_summaries, "csv_output_deck/pvt_summaries.csv", row.names = FALSE)
+```
+
+Generating the site level RDI and SDI plots
+
+```{r}
+# Putting the tree lists from all three time periods together
+all_density_estimates <-do.call("rbind", list(plot_estimates_2011, plot_estimates_1911))
+
+# Change recon year to factor and view new data...
+all_density_estimates$recon_year <- as.factor(all_density_estimates$recon_year)
+
+# Replace all NA values with 0 in the dataframe
+all_density_estimates[is.na(all_density_estimates)] <- 0
+
+# Bring in the max sdi values
+bpsass <- read.csv("csv_input_deck/plot_dates_plant_assoc_pvt_bps.csv")
+
+# Create the per acre sdi csv for each plot
+bpsass_max <- bpsass %>%
+  select("rodne_pid", "max_sdi", "field_pvt")
+
+all_density_estimates <- all_density_estimates %>%
+  inner_join(bpsass_max, by = "rodne_pid")
+
+all_density_estimates <- all_density_estimates %>%
+  mutate(rdi = sdi/max_sdi)
+
+# Plot the rdi values
+rdi_plot <-  ggplot(data = all_density_estimates, aes(x = site_name, y = rdi, fill = recon_year)) +
+  geom_boxplot(position = "dodge") +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Relative Density Index") +
+  scale_x_discrete("Site Name") +
+  labs(title = "RDI per Site in 1911 and 2011 (Density Plots)") +
+    theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position.inside = c(0.1, 0.8),
+          panel.background = element_rect(fill = "white", color = NA),  # Ensures white background
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill=guide_legend(title="Year"))
+
+rdi_plot
+
+ggsave("Graphics/metric_site_rdi_plot.png", plot = rdi_plot, width = 10, height = 6, dpi = 300)
+
+# Plot the sdi values
+sdi_plot <-  ggplot(data = all_density_estimates, aes(x = site_name, y = sdi, fill = recon_year)) +
+  geom_boxplot(position = "dodge") +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Stand Density Index") +
+  scale_x_discrete("Site Name") +
+  labs(title = "SDI per Site in 1911 and 2011 (Density Plots)") +
+    theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position.inside = c(0.1, 0.8),
+          panel.background = element_rect(fill = "white", color = NA),  # Ensures white background
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill=guide_legend(title="Year"))
+
+sdi_plot
+
+ggsave("Graphics/metric_site_sdi_plot.png", plot = sdi_plot, width = 10, height = 6, dpi = 300)
+```
+
+Generating the PVT level RDI and SDI plots
+
+```{r}
+# Putting the tree lists from all three time periods together
+all_density_estimates <-do.call("rbind", list(plot_estimates_2011, plot_estimates_1911))
+
+# Change recon year to factor and view new data...
+all_density_estimates$recon_year <- as.factor(all_density_estimates$recon_year)
+
+# Replace all NA values with 0 in the dataframe
+all_density_estimates[is.na(all_density_estimates)] <- 0
+
+# Bring in the max sdi values
+bpsass <- read.csv("csv_input_deck/plot_dates_plant_assoc_pvt_bps.csv")
+
+# Create the per acre sdi csv for each plot
+bpsass_max <- bpsass %>%
+  select("rodne_pid", "max_sdi", "field_pvt")
+
+all_density_estimates <- all_density_estimates %>%
+  inner_join(bpsass_max, by = "rodne_pid")
+
+all_density_estimates <- all_density_estimates %>%
+  mutate(rdi = sdi/max_sdi)
+
+all_density_estimates <- all_density_estimates %>%
+  filter(!field_pvt %in% c("Jeffrey pine", "Ponderosa pine - Dry")) %>%
+  filter(!site_name %in% c("Elder Creek", "Elliot Ridge"))
+
+# Plot the rdi values
+
+pvt_rdi_plot <-  ggplot(data = all_density_estimates, aes(x = field_pvt, y = rdi, fill = recon_year)) +
+  geom_boxplot(position = "dodge") +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Relative Density Index") +
+  scale_x_discrete("Field PVT") +
+  labs(title = "RDI per PVT in 1911 and 2011 (Density Plots)") +
+    theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position.inside = c(0.1, 0.8),
+          panel.background = element_rect(fill = "white", color = NA),  # Ensures white background
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill=guide_legend(title="Year"))
+
+pvt_rdi_plot
+
+ggsave("Graphics/metric_pvt_rdi_plot.png", plot = pvt_rdi_plot, width = 10, height = 6, dpi = 300)
+
+# Plot the sdi values
+
+pvt_sdi_plot <-  ggplot(data = all_density_estimates, aes(x = field_pvt, y = sdi, fill = recon_year)) +
+  geom_boxplot(position = "dodge") +
+  scale_fill_manual(values = c("1911" = "dodgerblue4", "2011" = "firebrick")) +
+  scale_y_continuous("Stand Density Index") +
+  scale_x_discrete("Field PVT") +
+  labs(title = "SDI per PVT in 1911 and 2011 (Density Plots)") +
+    theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position.inside = c(0.1, 0.8),
+          panel.background = element_rect(fill = "white", color = NA),  # Ensures white background
+        plot.background = element_rect(fill = "white", color = NA)) +
+  guides(fill=guide_legend(title="Year"))
+
+pvt_sdi_plot
+
+ggsave("Graphics/metric_pvt_sdi_plot.png", plot = pvt_sdi_plot, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+# Plot counts
+table(bpsass_max$field_pvt)
+
+##############
+# Douglas-fir - Dry
+df_dry <- all_density_estimates %>%
+  filter(recon_year == 1850, field_pvt == 'Douglas-fir - Dry')
+
+# Count plots for rdi > 0.60
+df_count_above_060 <- nrow(df_dry %>% filter(rdi > 0.60))
+
+# Count plots for 0.60 >= rdi > 0.35
+df_count_between_060_035 <- nrow(df_dry %>% filter(rdi <= 0.60, rdi > 0.35))
+
+# Count plots for rdi <= 0.35
+df_count_below_035 <- nrow(df_dry %>% filter(rdi <= 0.35))
+
+# Display counts
+df_count_above_060
+df_count_between_060_035
+df_count_below_035
+
+##############
+# Jeffrey pine
+jp <- all_density_estimates %>%
+  filter(recon_year == 1850, field_pvt == 'Jeffrey pine')
+
+# Count plots for rdi > 0.60
+jp_count_above_060 <- nrow(jp %>% filter(rdi > 0.60))
+
+# Count plots for 0.60 >= rdi > 0.35
+jp_count_between_060_035 <- nrow(jp %>% filter(rdi <= 0.60, rdi > 0.35))
+
+# Count plots for rdi <= 0.35
+jp_count_below_035 <- nrow(jp %>% filter(rdi <= 0.35))
+
+# Display counts
+jp_count_above_060
+jp_count_between_060_035
+jp_count_below_035
+
+##############
+# Tan oak - Douglas-fir - Dry
+td_dry <- all_density_estimates %>%
+  filter(recon_year == 1850, field_pvt == 'Tan oak - Douglas-fir - Dry')
+
+# Count plots for rdi > 0.60
+td_count_above_060 <- nrow(td_dry %>% filter(rdi > 0.60))
+
+# Count plots for 0.60 >= rdi > 0.35
+td_count_between_060_035 <- nrow(td_dry %>% filter(rdi <= 0.60, rdi > 0.35))
+
+# Count plots for rdi <= 0.35
+td_count_below_035 <- nrow(td_dry %>% filter(rdi <= 0.35))
+
+# Display counts
+td_count_above_060
+td_count_between_060_035
+td_count_below_035
+
+##############
+# White fir - Intermediate
+wf_int <- all_density_estimates %>%
+  filter(recon_year == 1850, field_pvt == 'White fir - Intermediate')
+
+# Count plots for rdi > 0.60
+wf_count_above_060 <- nrow(wf_int %>% filter(rdi > 0.60))
+
+# Count plots for 0.60 >= rdi > 0.35
+wf_count_between_060_035 <- nrow(wf_int %>% filter(rdi <= 0.60, rdi > 0.35))
+
+# Count plots for rdi <= 0.35
+wf_count_below_035 <- nrow(wf_int %>% filter(rdi <= 0.35))
+
+# Display counts
+wf_count_above_060
+wf_count_between_060_035
+wf_count_below_035
+```
+

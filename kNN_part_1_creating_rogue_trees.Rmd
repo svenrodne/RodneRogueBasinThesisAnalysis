@@ -1,0 +1,563 @@
+---
+title: "kNN_part_1_creating_rogue_trees"
+author: "Sven Rodne"
+date: "2025-12-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# Creating the rogue_trees file from live trees and the deathdated dead trees
+
+rm(list=ls())
+
+library(dplyr)
+library(ggplot2)
+library(here)
+library(tidyverse)
+
+# Load data, change pith offset to numeric, remove cores with no inner year, create pith column, and add harvest dates
+
+rogue_data <- read.csv(here("data_origin/cleaned_rogue_basin_data_2024.csv"))
+
+all_trees <- rogue_data[,c("site_name", "uid", "trid", 
+                           "stid", "multistem", "rcdm", "conifer", "rodne_site_ab", "rodne_pid", "plot_type", 
+                           "plot_size", "rodne_sid", "rodne_uid", "corvallis_core",
+                           "spcd", "diam_cm", "capo_num", "cond", "con_numeric", "inner_ring", 
+                           "outer_ring", "pith", "d2pith_cm", "metlen_age", "harvest_date", "tpi", "x", "y")]
+
+# Only include Big Butte, Elliott Ridge, Emigrant Creek, Evans Creek, and Trail Creek
+#all_trees <- all_trees %>%
+#  filter(site_name %in% c("Big Butte", "Emigrant Creek", "Evans Creek", "Trail Creek"))
+
+# Not including Boaz Gulch or the SA stem map
+table(all_trees$site_name)
+table(all_trees$rodne_pid)
+all_trees <- all_trees %>%
+  filter(!site_name == "Boaz Gulch" & !rodne_pid == "SA")
+
+# Correct the data structure
+all_trees <- all_trees %>%
+  mutate(.,
+         rodne_pid = factor(rodne_pid),
+         site_name = factor(site_name),
+         uid = factor(uid),
+         rodne_site_ab = factor(rodne_site_ab),
+         plot_type = factor(plot_type),
+         plot_size = factor(plot_size),
+         rodne_sid = factor(rodne_sid),
+         rodne_uid = factor(rodne_uid),
+         corvallis_core = factor(corvallis_core),
+         spcd = factor(spcd),
+         diam_cm = as.numeric(diam_cm),
+         capo_num = factor(capo_num),
+         cond = factor(cond),
+         con_numeric = factor(con_numeric),
+         tpi = factor(tpi))
+
+# Assuming your data frame is named df and the column is named col_name
+all_trees$pith[all_trees$pith == -999] <- NA
+
+# add harvest year, plant association, pvt, bps, insolation values, and year sampled
+invt_dates <- read.csv(here("csv_input_deck/plot_dates_plant_assoc_pvt_bps.csv"))
+invt_dates <- invt_dates[c("rodne_pid", "field_plant_assoc", "field_pvt", "bps_name", "insol", "insol_value", "elevation_m", "year_sampled")]
+table(invt_dates$field_pvt)
+
+
+# Merge harvest years with the all trees data frame
+all_trees <- merge(all_trees, invt_dates, by = "rodne_pid", all.x = TRUE)
+
+# Clean and shorten the column names
+all_trees <- all_trees %>%
+  dplyr::rename(plantassoc = field_plant_assoc,
+         pvt = field_pvt,
+         bps = bps_name,
+         elevation = elevation_m)
+
+# creating an age column
+all_trees <- all_trees %>%
+  mutate(true_age = ifelse(con_numeric == 1,
+                           year_sampled - pith,
+                           outer_ring - pith))
+
+# Create the "undateable.csv" that contains all the trees that we cant date
+non_aged_species <- c("ALRU", "CONU", "FRLA", "TSME", "UNKN")
+undateable <- all_trees %>%
+  filter(spcd %in% non_aged_species | is.na(diam_cm) | is.na(capo_num))
+
+# Write the undateable csv (trees that are missing critical parameters) (n = 1678)
+write.csv(undateable, 
+          here("csv_output_deck/undateable.csv"),
+          row.names=FALSE)
+
+################################################################################
+# Continue to create all_trees without the undateable
+# all_trees contains all trees dead or alive with the filtered columns and not 
+# including the unageable rows containing: ("ALRU", "CONU", "FRLA", "TSME", "UNKN") #5 species 
+# or na in diam_cm and capo_num
+age_species <- c("ABCO", "ARME", "CADE", "PIJE", "PILA", "PIPO", "PSME", "QUGA", "QUKE",
+                 "ABMAS", "ACMA", "CHCH", "CHLA", "LIDE", "QUCH", "UMCA", "TABR")
+
+all_trees <- all_trees %>%
+  filter(spcd %in% age_species & !is.na(diam_cm) & !is.na(capo_num))
+
+all_trees <- all_trees %>%
+  mutate(spcd_mod = case_when(
+    spcd %in% c("PIPO", "PIJE") ~ 1,
+    spcd == "PILA" ~ 2,
+    spcd %in% c("QUGA", "QUKE", "QUCH", "LIDE", "UMCA") ~ 3,
+    spcd == "PSME" ~ 4,
+    spcd %in% c("ABCO", "ABMAS") ~ 5,
+    spcd %in% c("ARME", "ACMA") ~ 6,
+    spcd %in% c("CADE", "CHLA", "CHCH", "TABR") ~ 7,
+    TRUE ~ NA_integer_
+  ))
+
+# What about the other climate variables like aet, pet, and water deficit?
+climate <- read.csv("csv_input_deck/rogue_climate_pvt.csv")
+
+# Change the name for rodne_pid in climate dataframe
+colnames(climate)[colnames(climate) == "Rodne_PID"] <- "rodne_pid"
+
+climate <- climate[!duplicated(climate$rodne_pid), ]
+
+# Select specific columns from climate data frame
+climate_selected <- climate[, c("rodne_pid", "WB_AET_Current_V2_2022", "WB_PET_Current_V2_2022", "WB_Deficit_Current_V2_2022_2023")]
+
+# Join based on 'id'
+all_trees <- merge(all_trees, climate_selected, by = "rodne_pid")
+
+# Rename the climate variable columns
+colnames(all_trees)[colnames(all_trees) == "WB_AET_Current_V2_2022"] <- "aet"
+colnames(all_trees)[colnames(all_trees) == "WB_PET_Current_V2_2022"] <- "pet"
+colnames(all_trees)[colnames(all_trees) == "WB_Deficit_Current_V2_2022_2023"] <- "deficit"
+
+# Round the values
+all_trees$aet <- round(all_trees$aet, 0)
+all_trees$pet <- round(all_trees$pet, 0)
+all_trees$deficit <- round(all_trees$deficit, 0)
+
+# Converting to inches
+all_trees$diam_in <- (all_trees$diam_cm/2.54)
+
+# Calculating the individual tree density values for the summation method of calculating stand density
+all_trees$inddensity <- (all_trees$diam_in/10)^1.6
+
+# Calculating basal area (sq ft) per acre in all_trees
+all_trees <- all_trees %>%
+  mutate(tree_area = (pi*(diam_in/2)^2)/144)
+
+# Bringing in the stand density from "extra_estimating_stand_density.R"
+density <- read.csv(here("csv_input_deck/stand_density_values.csv"))
+
+# Select specific columns from density data frame
+density_selected <- density[, c("rodne_pid", "tpa", "sdi_acre", "basal_area_acre")]
+
+# Join based on 'id'
+all_trees <- merge(all_trees, density_selected, by = "rodne_pid")
+
+# Round off the sdi, basal area, and tpa values
+all_trees$tpa <- round(all_trees$tpa, digits = 0)
+all_trees$sdi_acre <- round(all_trees$sdi_acre, digits = 0)
+all_trees$basal_area_acre <- round(all_trees$basal_area_acre, digits = 0)
+
+# Combining the biophysical characteristics into one column of stratum combos (biostrat)
+all_trees$biostrat <- paste(all_trees$pvt, all_trees$insol, all_trees$tpi, sep = ",")
+all_trees$biostrat = as.factor(all_trees$biostrat)
+
+# Filtering out the unneeded columns
+colnames(all_trees)
+all_trees <- all_trees[, c("rodne_uid", "rodne_pid", "site_name",  "uid", "trid", 
+                                    "stid", "multistem", "rcdm", "conifer",
+                                      "rodne_site_ab", "plot_type",  "plot_size",  
+                                      "rodne_sid",  "corvallis_core", "spcd", "diam_cm",  
+                                      "capo_num", "cond", "con_numeric",  "inner_ring", 
+                                      "outer_ring", "pith", "d2pith_cm", "metlen_age", "harvest_date", "plantassoc",
+                                      "pvt", "bps", "insol", "insol_value", "tpi", "true_age", "year_sampled", 
+                                      "spcd_mod", "aet", "pet", "deficit",  "elevation",  
+                                      "diam_in",  "inddensity", "tree_area",  "tpa",  
+                                      "sdi_acre", "basal_area_acre", "biostrat", "x", "y")]
+
+write.csv(all_trees, 
+          here("csv_output_deck/all_trees.csv"),
+          row.names=FALSE)
+
+# Write "live_trees.csv" that contains all LIVE trees from the applicable species data set
+live_trees <- all_trees %>%
+  filter(spcd %in% age_species) %>%
+  filter(cond=="LIVE")
+
+write.csv(live_trees, 
+          here("csv_output_deck/live_trees.csv"),
+          row.names=FALSE)
+
+################################################################################
+# Write "dead_trees.csv" that contains all LIVE trees from the applicable species data set
+dead_trees <- all_trees %>%
+  filter(spcd %in% age_species) %>%
+  filter(cond!="LIVE")
+
+# There are one of two ways to calculate the deathdates for the trees:
+################################################################################
+# Figure out when the trees died (Option 1: A mix of Rogers et al. 1984, Bakker 2008, Fule 1993, and Vandervlugt 2011)
+
+# Bringing in the live trees file again
+live_trees <- read.csv("csv_output_deck/live_trees.csv")
+
+# Calculating the snag fall rates
+dated <- live_trees %>%
+  filter(pith>1 & true_age>100)
+snagfalldatedcount <- dated %>%
+  dplyr::group_by(spcd_mod) %>% 
+  dplyr::summarise(avg_dbh = mean(diam_cm))
+snagfalldatedcount <- snagfalldatedcount %>%
+  mutate(snaglife = 1 + (avg_dbh / 2))
+snagfalldatedcount <- snagfalldatedcount %>%
+  mutate(snagfall = 1 / (snaglife))
+
+#write a csv
+write.csv(snagfalldatedcount, file = "csv_output_deck/snagfall_values.csv", row.names = FALSE)
+
+# Opening the snag fall values
+snagfalldatedcount <- read.csv("csv_output_deck/snagfall_values.csv")
+
+# Rename the snagfall rate column to snagfall_rogers
+names(snagfalldatedcount)[names(snagfalldatedcount) == "snagfall"] <- "snagfall_rogers"
+
+# Merge dead_trees with filtered snagfalldatedcount based on the species column
+snagfalldatedcount <- snagfalldatedcount[, c("spcd_mod", "snagfall_rogers")]
+dead_trees <- left_join(dead_trees, snagfalldatedcount, by = "spcd_mod")
+
+# Continue to the snag ages part if using the Rogers method, if not continue calculating Mellen
+
+################################################################################
+# Another way to bring in snag fall rates from Option 2: Mellen et al. (2012)
+
+# Bringing in the mellen_snag_rates.csv
+snag_rates <- read.csv("csv_input_deck/mellen_snag_rates.csv")
+
+# Editing the data
+consolidated_snag_rates <- snag_rates %>%
+  dplyr::group_by(species_group, slope_position, snag_dbh) %>%
+  dplyr::summarise(avg_snag_fall_rate = mean(snag_fall_rate))
+
+# Changing the column names to create duplicates in the dead_trees data frame
+names(consolidated_snag_rates)[names(consolidated_snag_rates) == "species_group"] <- "snag_spcd_group"
+names(consolidated_snag_rates)[names(consolidated_snag_rates) == "slope_position"] <- "snag_slope"
+names(consolidated_snag_rates)[names(consolidated_snag_rates) == "avg_snag_fall_rate"] <- "snagfall_mellen"
+
+# Now to give each dead tree a snag_fall_rate based on the match of data between
+# the dead trees and the consolidated_snag_rates data frames
+# Assigning the snag_spcd_group
+dead_trees <- dead_trees %>%
+  mutate(snag_spcd_group = case_when(
+    spcd %in% c("PIPO", "PIJE") ~ "Ponderosa pine (OR)",
+    spcd == "PILA" ~ "Western white pine",
+    spcd %in% c("QUGA", "QUKE", "QUCH", "LIDE", "UMCA") ~ "Misc hardwoods",
+    spcd == "PSME" ~ "Douglas-fir (east OR)",
+    spcd %in% c("ABCO", "ABMAS") ~ "Grand/white fir",
+    spcd == "ARME" ~ "Pacific madrone",
+    spcd == "ACMA" ~ "Alder",
+    spcd %in% c("CADE", "CHLA", "CHCH", "TABR") ~ "Western redcedar",
+    TRUE ~ NA_character_
+  ))
+
+# Assigning the snag_slope
+dead_trees <- dead_trees %>%
+  mutate(snag_slope = case_when(
+    tpi == "Ridge Top" ~ "Ridgetop",
+    tpi %in% c("Bottom Slope", "Mid Slope") ~ "Other",
+    TRUE ~ NA_character_
+  ))
+
+# Assigning the snag_dbh
+dead_trees <- dead_trees %>%
+  mutate(
+    snag_dbh = ifelse(
+      spcd %in% c("ARME", "PIJE", "PILA", "PIPO", "QUGA", "QUKE",
+                  "ACMA", "LIDE", "QUCH", "UMCA", "TABR"),
+      case_when(
+        diam_cm < 20 ~ "Small",
+        between(diam_cm, 20, 50) ~ "Medium",
+        diam_cm > 50 ~ "Large",
+        TRUE ~ NA_character_
+      ),
+      ifelse(
+        spcd %in% c("ABCO", "CADE", "PSME", "ABMAS", "CHCH", "CHLA"),
+        case_when(
+          diam_cm < 25 ~ "Small",
+          between(diam_cm, 25, 75) ~ "Medium",
+          diam_cm > 75 ~ "Large",
+          TRUE ~ NA_character_
+        ),
+        NA_character_)))
+
+# Bring the consolidated_snag_rates snag_rates in to merge with dead_trees
+# Left join the tree data frame with the consolidated data frame based on common columns
+dead_trees <- merge(dead_trees, consolidated_snag_rates, by.x = c("snag_spcd_group", "snag_slope", "snag_dbh"), by.y = c("snag_spcd_group", "snag_slope", "snag_dbh"), all.x = TRUE)
+
+################################################################################
+# Now apply either the snag fall rate from the Rogers et al (the first data mutations here) or Mellen et al (second) methods/data
+################################################################################
+# Rogers et al
+# 25%, 50%, and 75% Columns that determines how many years need to be taken from year_sampled
+# For 25%
+dead_trees <- dead_trees %>%
+  mutate(
+    decay_25_rogers = ifelse(con_numeric == 4,
+                      ((log(.25) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 5,
+                      ((log(.25) - log(1)) / log(1.15)) + 
+                      ((log(.25) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 6,
+                      ((log(.25) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.25) - log(1)) / log(1.15)) + 
+                      ((log(.25) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 7,
+                      ((log(.25) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.25) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.25) - log(1)) / log(1.15)) +
+                      ((log(.25) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 8,
+                      ((log(.25) - log(1)) / log(1 + snagfall_rogers)) +
+                      ((log(.25) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.25) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.25) - log(1)) / log(1.15)) + 
+                      ((log(.25) - log(1)) / log(1.2)),
+                      NA_real_))))))  # Handle other cases (if any) with NA or specify a default value
+    
+# For 50%
+dead_trees <- dead_trees %>%
+  mutate(
+    decay_50_rogers = ifelse(con_numeric == 4,
+                      ((log(.50) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 5,
+                      ((log(.50) - log(1)) / log(1.15)) + 
+                      ((log(.50) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 6,
+                      ((log(.50) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.50) - log(1)) / log(1.15)) + 
+                      ((log(.50) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 7,
+                      ((log(.50) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.50) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.50) - log(1)) / log(1.15)) +
+                      ((log(.50) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 8,
+                      ((log(.50) - log(1)) / log(1 + snagfall_rogers)) +
+                      ((log(.50) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.50) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.50) - log(1)) / log(1.15)) + 
+                      ((log(.50) - log(1)) / log(1.2)),
+                      NA_real_))))))  # Handle other cases (if any) with NA or specify a default value
+
+# For 75%
+dead_trees <- dead_trees %>%
+  mutate(
+    decay_75_rogers = ifelse(con_numeric == 4,
+                      ((log(.75) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 5,
+                      ((log(.75) - log(1)) / log(1.15)) + 
+                      ((log(.75) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 6,
+                      ((log(.75) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.75) - log(1)) / log(1.15)) + 
+                      ((log(.75) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 7,
+                      ((log(.75) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.75) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.75) - log(1)) / log(1.15)) +
+                      ((log(.75) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 8,
+                      ((log(.75) - log(1)) / log(1 + snagfall_rogers)) +
+                      ((log(.75) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.75) - log(1)) / log(1 + snagfall_rogers)) + 
+                      ((log(.75) - log(1)) / log(1.15)) + 
+                      ((log(.75) - log(1)) / log(1.2)),
+                      NA_real_))))))  # Handle other cases (if any) with NA or specify a default value
+
+################################################################################
+# mellen et al
+# 25%, 50%, and 75% Columns that determines how many years need to be taken from year_sampled
+# For 25%
+dead_trees <- dead_trees %>%
+  mutate(
+    decay_25_mellen = ifelse(con_numeric == 4,
+                      ((log(.25) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 5,
+                      ((log(.25) - log(1)) / log(1.15)) + 
+                      ((log(.25) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 6,
+                      ((log(.25) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.25) - log(1)) / log(1.15)) + 
+                      ((log(.25) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 7,
+                      ((log(.25) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.25) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.25) - log(1)) / log(1.15)) +
+                      ((log(.25) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 8,
+                      ((log(.25) - log(1)) / log(1 + snagfall_mellen)) +
+                      ((log(.25) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.25) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.25) - log(1)) / log(1.15)) + 
+                      ((log(.25) - log(1)) / log(1.2)),
+                      NA_real_))))))  # Handle other cases (if any) with NA or specify a default value
+
+# For 50%
+dead_trees <- dead_trees %>%
+  mutate(
+    decay_50_mellen = ifelse(con_numeric == 4,
+                      ((log(.50) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 5,
+                      ((log(.50) - log(1)) / log(1.15)) + 
+                      ((log(.50) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 6,
+                      ((log(.50) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.50) - log(1)) / log(1.15)) + 
+                      ((log(.50) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 7,
+                      ((log(.50) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.50) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.50) - log(1)) / log(1.15)) +
+                      ((log(.50) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 8,
+                      ((log(.50) - log(1)) / log(1 + snagfall_mellen)) +
+                      ((log(.50) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.50) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.50) - log(1)) / log(1.15)) + 
+                      ((log(.50) - log(1)) / log(1.2)),
+                      NA_real_))))))  # Handle other cases (if any) with NA or specify a default value
+
+# For 75%
+dead_trees <- dead_trees %>%
+  mutate(
+    decay_75_mellen = ifelse(con_numeric == 4,
+                      ((log(.75) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 5,
+                      ((log(.75) - log(1)) / log(1.15)) + 
+                      ((log(.75) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 6,
+                      ((log(.75) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.75) - log(1)) / log(1.15)) + 
+                      ((log(.75) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 7,
+                      ((log(.75) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.75) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.75) - log(1)) / log(1.15)) +
+                      ((log(.75) - log(1)) / log(1.2)),
+                      ifelse(con_numeric == 8,
+                      ((log(.75) - log(1)) / log(1 + snagfall_mellen)) +
+                      ((log(.75) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.75) - log(1)) / log(1 + snagfall_mellen)) + 
+                      ((log(.75) - log(1)) / log(1.15)) + 
+                      ((log(.75) - log(1)) / log(1.2)),
+                      NA_real_))))))  # Handle other cases (if any) with NA or specify a default value
+
+# Creating another column that is the endyear of each tree after applying the 50% year decay
+dead_trees$year_sampled <- as.numeric(dead_trees$year_sampled)
+
+# Rogers calculations of the 50% decomposition rate end year
+dead_trees$endyear_rogers <- dead_trees$year_sampled + dead_trees$decay_50_rogers
+dead_trees$endyear_rogers <- round(dead_trees$endyear_rogers)
+
+# Mellen calculations of the 50% decomposition rate end year
+dead_trees$endyear_mellen <- dead_trees$year_sampled + dead_trees$decay_50_mellen
+dead_trees$endyear_mellen <- round(dead_trees$endyear_mellen)
+
+# Convert con_numeric variable to numeric
+dead_trees <- dead_trees %>%
+  mutate(con_numeric = as.numeric(as.character(con_numeric)))
+
+# Generating the death years
+dead_trees <- dead_trees %>%
+  mutate(
+    deathyear_rogers = case_when(
+      con_numeric == 2 ~ harvest_date,
+      con_numeric == 3 ~ year_sampled,
+      con_numeric > 3 ~ endyear_rogers,
+      TRUE ~ NA_real_
+    ),
+    deathyear_mellen = case_when(
+      con_numeric == 2 ~ harvest_date,
+      con_numeric == 3 ~ year_sampled,
+      con_numeric > 3 ~ endyear_mellen,
+      TRUE ~ NA_real_
+    )
+  )
+
+
+################################################################################
+# Write it!
+write.csv(dead_trees, 
+          here("csv_output_deck/dead_trees.csv"),
+          row.names=FALSE)
+
+################################################################################
+# Correct data structure to bind rows of live and dead trees to rogue_trees for the KNN Algorithm
+dead_trees <- dead_trees %>%
+  mutate(.,
+         rodne_pid = factor(rodne_pid),
+         site_name = factor(site_name),
+         uid = factor(uid),
+         rodne_site_ab = factor(rodne_site_ab),
+         plot_type = factor(plot_type),
+         plot_size = factor(plot_size),
+         rodne_sid = factor(rodne_sid),
+         rodne_uid = factor(rodne_uid),
+         corvallis_core = factor(corvallis_core),
+         spcd = factor(spcd),
+         diam_cm = as.numeric(diam_cm),
+         capo_num = factor(capo_num),
+         cond = factor(cond),
+         con_numeric = factor(con_numeric),
+         pvt = factor(pvt),
+         insol = factor(insol),
+         tpi = factor(tpi))
+
+live_trees <- live_trees %>%
+  mutate(.,
+         rodne_pid = factor(rodne_pid),
+         site_name = factor(site_name),
+         uid = factor(uid),
+         rodne_site_ab = factor(rodne_site_ab),
+         plot_type = factor(plot_type),
+         plot_size = factor(plot_size),
+         rodne_sid = factor(rodne_sid),
+         rodne_uid = factor(rodne_uid),
+         corvallis_core = factor(corvallis_core),
+         spcd = factor(spcd),
+         diam_cm = as.numeric(diam_cm),
+         capo_num = factor(capo_num),
+         cond = factor(cond),
+         con_numeric = factor(con_numeric),
+         pvt = factor(pvt),
+         insol = factor(insol),
+         tpi = factor(tpi))
+
+# Merging the live and dead trees into rogue trees
+rogue_trees <- bind_rows(live_trees, dead_trees)
+
+# Creating a new column that gives an end_date value for measurements (model_pith still serves as the theoretical start year)
+rogue_trees$con_numeric <- as.numeric(rogue_trees$con_numeric)
+rogue_trees$deathyear_mellen <- as.numeric(rogue_trees$deathyear_mellen)
+rogue_trees$year_sampled <- as.numeric(rogue_trees$year_sampled)
+
+# Making the end_year column
+rogue_trees <- rogue_trees %>%
+  mutate(end_year = ifelse(con_numeric > 1, deathyear_mellen, ifelse(con_numeric == 1, year_sampled, NA)))
+rogue_trees$end_year <- as.numeric(rogue_trees$end_year)
+
+# Creating the "rogue_trees.csv" that contains the aged live and dead trees
+write.csv(rogue_trees, 
+          "csv_output_deck/rogue_trees.csv",
+          row.names=FALSE)
+
+table(rogue_trees$biostrat)
+
+```
+

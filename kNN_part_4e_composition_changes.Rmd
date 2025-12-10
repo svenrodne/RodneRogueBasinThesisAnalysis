@@ -1,0 +1,917 @@
+---
+title: "kNN_part_3e_composition_changes"
+author: "Sven Rodne"
+date: "2024-08-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Library
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpattern)
+```
+
+```{r}
+# Bringing in the data
+rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+table(rogue_ages$spcd)
+sort(table(rogue_ages$spcd), decreasing = TRUE)
+```
+
+Attempting to create a graph showing min and max ages for all 17 species
+
+```{r}
+# rogue_limit is the rogue_ages dataframe with only live trees
+rogue_limit <- rogue_ages %>%
+  filter(!is.na(pith))
+
+# Summarize min/max years and count for each species
+species_range <- rogue_limit %>%
+  group_by(spcd) %>%
+  summarize(
+    min_year = min(pith, na.rm = TRUE),
+    max_year = max(end_year, na.rm = TRUE),
+    count = n()  # Count of live trees per species
+  ) %>%
+  ungroup() %>%
+  # Create species label with count
+  mutate(spcd_label = paste0(spcd, " (n=", count, ")"))
+
+# Create the plot
+ggplot(species_range, aes(y = reorder(spcd_label, -min_year), xmin = min_year, xmax = max_year)) +
+  geom_linerange(aes(xmin = min_year, xmax = max_year), linewidth = 1.5, color = "blue") +
+  geom_point(aes(x = min_year), size = 3, color = "red") +  # Start year
+  geom_point(aes(x = max_year), size = 3, color = "black") +  # End year
+  labs(title = "Min and Max Years for Tree Species",
+       x = "Year",
+       y = "Species (n)") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10))
+```
+
+Making the pith year distributions plot that shows each cored species
+
+```{r}
+# Filter live trees
+rogue_limit <- rogue_ages %>%
+  filter(!is.na(pith))
+
+# Count number of trees per species
+species_count <- rogue_limit %>%
+  group_by(spcd) %>%
+  summarise(count = n()) %>%
+  filter(count >= 50)  # Remove species with fewer than 15 samples
+
+# Merge species count into main data
+rogue_limit <- rogue_limit %>%
+  inner_join(species_count, by = "spcd") %>%  # Keep only species with count >= 15
+  mutate(spcd_label = paste0(spcd, " (n=", count, ")"))
+
+# Create boxplot with flipped axes
+ggplot(rogue_limit, aes(y = reorder(spcd_label, pith, FUN = median), x = pith)) +
+  geom_boxplot(fill = "lightblue", color = "black", outlier.shape = NA) +  # Boxplot without outliers
+  geom_jitter(height = 0.2, size = 1, alpha = 0.5, color = "red") +  # Add jittered points for visibility
+  labs(title = "Distribution of Pith Years by Species",
+       y = "Species (n)",
+       x = "Pith Year") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10))
+
+```
+
+Attempting to change the size of the dot to correspond to the diameter of the tree
+
+```{r}
+# Filter live trees
+rogue_limit <- rogue_ages %>%
+  filter(!is.na(pith)) %>%
+  filter(cond=="LIVE") %>%
+  mutate(true_age = end_year - pith)
+
+# Count number of trees per species
+species_count <- rogue_limit %>%
+  group_by(spcd) %>%
+  summarise(count = n()) %>%
+  filter(count >= 50)  # Remove species with fewer than 50 samples
+
+# Merge species count into main data
+rogue_limit <- rogue_limit %>%
+  inner_join(species_count, by = "spcd") %>%
+  mutate(spcd_label = paste0(spcd, " (n=", count, ")"))
+
+# Create boxplot with flipped axes
+ggplot(rogue_limit, aes(y = reorder(spcd_label, true_age, FUN = median), x = true_age)) +
+  geom_boxplot(fill = "lightblue", color = "black", outlier.shape = NA) +  # Boxplot without outliers
+  geom_jitter(aes(color = diam_cm), height = 0.2, size = 1.5, alpha = 0.7) +  # Jittered points with color based on diameter
+  scale_color_gradient(low = "orange", high = "darkblue", name = "Tree Diameter (cm)") +  # Color gradient from red (small) to blue (large)
+  labs(title = "Cored Tree Distribution of Ages by Species",
+       y = "Species (n)",
+       x = "Age") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10))
+
+```
+
+
+```{r}
+# Filter data for trees with diameter > 10 and included in respective years
+live_trees_2011 <- rogue_ages %>%
+  filter(include_2011 == "YES" & diam_in_2011 > 10 & plot_type == "stem")
+sort(table(live_trees_2011$spcd), decreasing = TRUE)
+
+live_trees_1911 <- rogue_ages %>%
+  filter(include_1911 == "YES" & diam_in_1911 > 10 & plot_type == "stem")
+sort(table(live_trees_1911$spcd), decreasing = TRUE)
+
+# Calculate tree density and basal area for each species per plot for 2011
+species_density_2011 <- live_trees_2011 %>%
+  group_by(rodne_pid, spcd) %>%
+  dplyr::summarise(trees_per_plot_2011 = n(), basal_area_2011 = sum(ba_2011_ft2)) %>%
+  ungroup()
+
+# Calculate tree density and basal area for each species per plot for 1911
+species_density_1911 <- live_trees_1911 %>%
+  group_by(rodne_pid, spcd) %>%
+  dplyr::summarise(trees_per_plot_1911 = n(), basal_area_1911 = sum(ba_1911_ft2)) %>%
+  ungroup()
+
+# See both 1911 and 2011 values for tree density and basal area                                         
+
+species_density_combined <- full_join(species_density_1911, species_density_2011, 
+                                      by = c("rodne_pid", "spcd")) %>%
+  mutate(across(c(trees_per_plot_1911, basal_area_1911, 
+                  trees_per_plot_2011, basal_area_2011), 
+                ~ replace_na(.x, 0)))  # Replace NA values with 0
+
+# Calculate total tree density and basal area per plot for 2011
+total_density_2011 <- species_density_2011 %>%
+  group_by(rodne_pid) %>%
+  summarise(total_trees_2011 = sum(trees_per_plot_2011), total_basal_area_2011 = sum(basal_area_2011)) %>%
+  ungroup()
+
+# Calculate total tree density and basal area per plot for 1911
+total_density_1911 <- species_density_1911 %>%
+  group_by(rodne_pid) %>%
+  summarise(total_trees_1911 = sum(trees_per_plot_1911), total_basal_area_1911 = sum(basal_area_1911)) %>%
+  ungroup()
+
+# Merge species density data with total density data for 2011
+species_density_2011 <- species_density_2011 %>%
+  left_join(total_density_2011, by = "rodne_pid") %>%
+  mutate(percentage_tree_density_2011 = (trees_per_plot_2011 / total_trees_2011) * 100,
+         percentage_basal_area_2011 = (basal_area_2011 / total_basal_area_2011) * 100,
+         year = "2011")
+
+# Merge species density data with total density data for 1911
+species_density_1911 <- species_density_1911 %>%
+  left_join(total_density_1911, by = "rodne_pid") %>%
+  mutate(percentage_tree_density_1911 = (trees_per_plot_1911 / total_trees_1911) * 100,
+         percentage_basal_area_1911 = (basal_area_1911 / total_basal_area_1911) * 100,
+         year = "1911")
+
+# Combine 1911 and 2011 data for plotting
+species_density_combined <- bind_rows(
+  species_density_2011 %>% select(rodne_pid, spcd, percentage_tree_density_2011, percentage_basal_area_2011, year) %>%
+    rename(percentage_tree_density = percentage_tree_density_2011, percentage_basal_area = percentage_basal_area_2011),
+  species_density_1911 %>% select(rodne_pid, spcd, percentage_tree_density_1911, percentage_basal_area_1911, year) %>%
+    rename(percentage_tree_density = percentage_tree_density_1911, percentage_basal_area = percentage_basal_area_1911))
+
+# Combine and pivot data for plotting
+species_density_combined <- species_density_combined %>%
+  pivot_longer(cols = starts_with("percentage_"),
+               names_to = "type",
+               values_to = "percentage") %>%
+  mutate(type = ifelse(type == "percentage_tree_density", "Tree Density", "Basal Area"))
+```
+
+# This is the ordered way to get the bars of the same plot next to each other
+
+```{r}
+# Define the color palette
+species_colors <- c(
+  "LIDE" = "#0072B2",
+  "TABR" = "#F0E442",  # Yellow
+  "UMCA" = "#E69F00",   # Orange
+  "ABCO" = "#332288", 
+  "ABMAS" = "#88CCEE", 
+  "ACMA" = "#999933",
+  "ARME" = "#AA4499", 
+   "CADE" = "#CC6677", 
+   "CHCH" = "#44AA99",
+   "PILA" = "#882255", 
+   "PIPO" = "#DDCC77", 
+  "PSME" = "#6699cc",
+  "QUCH" = "#117733", 
+  "QUGA" = "#661100", 
+  "QUKE" = "#888888",
+  "CHLA" = "#56B4E9",
+  "PIJE" = "#009E73")
+
+species_patterns <- c(
+  "ABCO" = "none",
+  "ABMAS" = "none",
+  "ACMA" = "none",
+  "ARME" = "none",
+  "CADE" = "none",
+  "CHCH" = "none",
+  "CHLA" = "none",
+  "LIDE" = "none",
+  "PIJE" = "none",
+  "PILA" = "none",
+  "PIPO" = "none",
+  "PSME" = "none",
+  "QUCH" = "none",
+  "QUGA" = "none",
+  "QUKE" = "none",
+  "TABR" = "none",
+  "UMCA" = "none"
+)
+
+# Basal Area
+# Arrange the data by 'rodne_pid' and 'year'
+species_basal_combined <- species_density_combined %>%
+  filter(type == "Basal Area") %>%
+  arrange(rodne_pid, year) %>%
+  mutate(rodne_year = interaction(rodne_pid, year, sep = " ")) %>%
+  mutate(rodne_year = factor(rodne_year, levels = unique(rodne_year)))
+  
+# Calculate positions for the dividing lines after every two bars
+vline_positions <- seq(2.5, length(unique(species_basal_combined$rodne_year)), by = 2)
+
+# Plot the data
+ggplot(species_basal_combined, aes(x = rodne_year, y = percentage, fill = spcd, pattern = spcd)) +
+  geom_bar_pattern(stat = "identity", position = "stack", width = 0.60, pattern_density = 0.15,
+                   pattern_spacing = 0.015, pattern_fill = "black") +
+  geom_vline(xintercept = vline_positions, linetype = "dashed", color = "black", size = 0.75) + # Add dividing lines
+  scale_fill_manual(values = species_colors, name = "Species") +
+  scale_pattern_manual(values = species_patterns, name = "Species") +
+  theme_minimal(base_size = 12) +  # Adjust base font size for readability
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major.x = element_blank(),  # Remove vertical grid lines
+        panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90"),
+        axis.title.y = element_text(vjust = 2),  # Add some space between y-axis title and labels
+        axis.title.x = element_text(vjust = -0.5),  # Add some space between x-axis title and labels
+        plot.title = element_text(hjust = 0.5, face = "bold")) +  # Center the plot title and make it bold
+  labs(title = "Composition of Tree Species by Plot in 1911 and 2011 (Basal Area)",
+       x = "Plot and Year", y = "Percentage by Basal Area") +
+  scale_x_discrete(labels = function(x) gsub("\\.", " ", x))  # Adjust x-axis labels
+  guides(fill = guide_legend(override.aes = list(pattern = species_patterns, color = species_colors)),
+         pattern = guide_legend(override.aes = list(fill = species_colors)))
+
+
+# Tree Density
+# Arrange the data by 'rodne_pid' and 'year'
+species_trees_combined <- species_density_combined %>%
+  filter(type == "Tree Density") %>%
+  arrange(rodne_pid, year) %>%
+  mutate(rodne_year = interaction(rodne_pid, year, sep = " ")) %>%
+  mutate(rodne_year = factor(rodne_year, levels = unique(rodne_year)))
+
+# Calculate positions for the dividing lines after every two bars
+vline_positions <- seq(2.5, length(unique(species_trees_combined$rodne_year)), by = 2)
+
+# Plot the data
+ggplot(species_trees_combined, aes(x = rodne_year, y = percentage, fill = spcd, pattern = spcd)) +
+  geom_bar_pattern(stat = "identity", position = "stack", width = 0.7, 
+                   pattern_density = 0.4, pattern_spacing = 0.015, 
+                   pattern_fill = "black", pattern_key_scale_factor = 1) +  # Adjust scale factor to keep pattern inside bars
+  geom_vline(xintercept = vline_positions, linetype = "dashed", color = "black", size = 0.75) + # Add dividing lines
+  scale_fill_manual(values = species_colors, name = "Species") +
+  scale_pattern_manual(values = species_patterns, name = "Species") +
+  theme_minimal(base_size = 11) +  # Adjust base font size for readability
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major.x = element_blank(),  # Remove vertical grid lines
+        panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90"),
+        axis.title.y = element_text(vjust = 2),  # Add some space between y-axis title and labels
+        axis.title.x = element_text(vjust = -0.5),  # Add some space between x-axis title and labels
+        plot.title = element_text(hjust = 0.5, face = "bold")) +  # Center the plot title and make it bold
+  labs(title = "Composition of Tree Species by Plot in 1911 and 2011 (Stems per Acre)",
+       x = "Plot and Year", y = "Percentage by Stems") +
+  scale_x_discrete(labels = function(x) gsub("\\.", " ", x))  # Adjust x-axis labels
+
+```
+
+```{r}
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Basal Area") %>%
+  filter(!spcd %in% c("CHCH", "QUGA", "ABMAS")) %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  scale_fill_manual(values = species_colors) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "1911 to 2011 Species Composition Basal Area Percentage Changes (Stem Maps)",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+# Tree Density
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Tree Density") %>%
+  filter(!spcd %in% c("CHCH", "QUGA", "ABMAS")) %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "1911 to 2011 Species Composition Stem Density Percentage Changes (Stem Maps)",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+# Violin Basal Area
+percentage_changes <- species_density_combined %>%
+  filter(type == "Basal Area") %>%
+  filter(!spcd %in% c("CHCH", "QUGA", "ABMAS")) %>%
+  spread(year, percentage) %>%  
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  
+  filter(!is.na(percentage_change))  
+
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_violin(trim = FALSE) +  # Use violin plot, without trimming the tails
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "1911 to 2011 Species Composition Basal Area Percentage Changes (Stem Maps)",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the violin plot horizontal
+
+# Violin Tree Density
+percentage_changes <- species_density_combined %>%
+  filter(type == "Tree Density") %>%
+  filter(!spcd %in% c("CHCH", "QUGA", "ABMAS")) %>%
+  spread(year, percentage) %>%  
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  
+  filter(!is.na(percentage_change))  
+
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_violin(trim = FALSE) +  # Use violin plot, without trimming the tails
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "1911 to 2011 Species Composition Stem Density Percentage Changes (Stem Maps)",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the violin plot horizontal
+```
+
+# Density plot calculations
+
+```{r}
+# Filter data for trees with diameter > 4 and included in respective years
+live_trees_2011 <- rogue_ages %>%
+  filter(include_2011 == "YES" & diam_in_2011 > 4 & plot_type == "density")
+
+live_trees_1911 <- rogue_ages %>%
+  filter(include_1911 == "YES" & diam_in_1911 > 4 & plot_type == "density")
+
+# Calculate tree density and basal area for each species per plot for 2011
+species_density_2011 <- live_trees_2011 %>%
+  group_by(site_name, rodne_pid, pvt, spcd) %>%
+  summarise(trees_per_plot_2011 = n(), basal_area_2011 = sum(ba_2011_ft2)) %>%
+  ungroup()
+
+# Calculate tree density and basal area for each species per plot for 1911
+species_density_1911 <- live_trees_1911 %>%
+  group_by(site_name, rodne_pid, pvt, spcd) %>%
+  summarise(trees_per_plot_1911 = n(), basal_area_1911 = sum(ba_1911_ft2)) %>%
+  ungroup()
+
+# Calculate total tree density and basal area per plot for 2011
+total_density_2011 <- species_density_2011 %>%
+  group_by(pvt) %>%
+  summarise(total_trees_2011 = sum(trees_per_plot_2011), total_basal_area_2011 = sum(basal_area_2011)) %>%
+  ungroup()
+
+# Calculate total tree density and basal area per plot for 1911
+total_density_1911 <- species_density_1911 %>%
+  group_by(pvt) %>%
+  summarise(total_trees_1911 = sum(trees_per_plot_1911), total_basal_area_1911 = sum(basal_area_1911)) %>%
+  ungroup()
+
+# Merge species density data with total density data for 2011
+species_density_2011 <- species_density_2011 %>%
+  left_join(total_density_2011, by = "pvt") %>%
+  mutate(percentage_tree_density_2011 = (trees_per_plot_2011 / total_trees_2011) * 100,
+         percentage_basal_area_2011 = (basal_area_2011 / total_basal_area_2011) * 100,
+         year = "2011")
+
+# Merge species density data with total density data for 1911
+species_density_1911 <- species_density_1911 %>%
+  left_join(total_density_1911, by = "pvt") %>%
+  mutate(percentage_tree_density_1911 = (trees_per_plot_1911 / total_trees_1911) * 100,
+         percentage_basal_area_1911 = (basal_area_1911 / total_basal_area_1911) * 100,
+         year = "1911")
+
+# Combine 1850, 1911, and 2011 data for plotting
+species_density_combined <- bind_rows(
+  species_density_2011 %>%
+    select(spcd, pvt, rodne_pid, percentage_tree_density_2011, percentage_basal_area_2011, year) %>%
+    rename(percentage_tree_density = percentage_tree_density_2011, percentage_basal_area = percentage_basal_area_2011),
+  species_density_1911 %>%
+    select(spcd, pvt, rodne_pid, percentage_tree_density_1911, percentage_basal_area_1911, year) %>%
+    rename(percentage_tree_density = percentage_tree_density_1911, percentage_basal_area = percentage_basal_area_1911))
+
+# Combine and pivot data for plotting
+species_density_combined <- species_density_combined %>%
+  pivot_longer(cols = starts_with("percentage_"),
+               names_to = "type",
+               values_to = "percentage") %>%
+  mutate(type = ifelse(type == "percentage_tree_density", "Tree Density", "Basal Area"))
+
+# Calculate 100-year absolute change for tree density and basal area
+species_absolute_change <- species_density_1911 %>%
+  select(site_name, rodne_pid, pvt, spcd, trees_per_plot_1911) %>%
+  full_join(species_density_2011 %>%
+              select(site_name, rodne_pid, pvt, spcd, trees_per_plot_2011))
+
+# Change NA to 0
+species_absolute_change <- species_absolute_change %>%
+  mutate(across(everything(), ~replace_na(.x, 0)))
+
+# Calculate the percentage and absolute changes in species
+species_absolute_change <- species_absolute_change %>%
+  mutate(
+    tree_density_change = trees_per_plot_2011 - trees_per_plot_1911)
+
+# Collecting the column names for species_absolute_change
+#edit(names(species_absolute_change))
+
+# Additionally want to calculate the mean of each species in each site
+species_mean_change <- species_absolute_change %>%
+  group_by(site_name, spcd) %>%
+  summarise(mean_change = mean(tree_density_change)) %>%
+  ungroup()
+
+species_mean_change$mean_hectare <- species_mean_change$mean_change * 10
+
+# Looking at the data as wide view with the plots in rows and all species changes
+# Remove all minor and uncored species
+major_spcd_change <- species_absolute_change %>%
+  filter(spcd %in% c("PSME", "ARME", "PIPO", "ABCO", "PILA", "QUKE", "CADE"))  # Ensure species filtering
+
+# Prepping the data to show the species changes in each plot all on one row
+major_spcd_change <- major_spcd_change %>%
+  select(site_name, rodne_pid, spcd, tree_density_change) %>%
+  pivot_wider(names_from = spcd, values_from = tree_density_change, values_fill = NA)
+
+# Alternative look at all species
+all_spcd_change <- species_absolute_change %>%
+  select(site_name, pvt, rodne_pid, spcd, tree_density_change) %>%
+  pivot_wider(names_from = spcd, values_from = tree_density_change, values_fill = NA)
+```
+Run only with the updated sdi_rdi_comps.csv produced from running part_4f
+Updated 3/2/2025
+
+```{r}
+# Only run this with part 4e
+sdi_rdi_comps <- read.csv("csv_output_deck/sdi_rdi_comps.csv")
+
+# Merge both data frames by 'rodne_pid'
+major_spcd_change$site_name <- NULL
+merged_data <- full_join(sdi_rdi_comps, major_spcd_change, by = "rodne_pid")
+
+# Define the target columns
+target_cols <- c("ARME", "PSME", "PIPO", "QUKE", "PILA", "ABCO", "CADE")
+
+# Calculate the number of plots with an increase (>0) and a decrease (<0)
+num_plots_with_increase <- colSums(merged_data[, target_cols] > 0, na.rm = TRUE)
+num_plots_no_change <- colSums(merged_data[, target_cols] == 0, na.rm = TRUE)
+num_plots_with_decrease <- colSums(merged_data[, target_cols] < 0, na.rm = TRUE)
+
+# Calculate total number of non-NA rows for each species
+total_non_na <- colSums(!is.na(merged_data[, target_cols]))
+
+# Combine results into a data frame for clarity
+summary_stats <- data.frame(
+  Species = target_cols,
+  Number_of_plots_with_increase = num_plots_with_increase,
+  Number_of_plots_with_no_change = num_plots_no_change,
+  Number_of_plots_with_decrease = num_plots_with_decrease,
+  Total_number_plots_present = total_non_na
+)
+
+# Print results
+print(summary_stats)
+
+# Load libraries
+library(gridExtra)
+library(ggplot2)
+library(ggpubr)
+
+# Define output file
+output_file <- "Graphics/summary_stats.png"
+
+# Create a table grob (graphical object)
+table_grob <- tableGrob(summary_stats)
+
+# Save the table as a PNG image
+png(output_file, width = 800, height = 400)  # Adjust size as needed
+grid::grid.draw(table_grob)  # Draw the table
+dev.off()  # Close the graphics device
+
+# Message to confirm
+cat("Table saved as:", output_file)
+```
+
+```{r}
+species <- merged_data$CADE
+
+ggplot(merged_data, aes(x = sdi_diff, y = species, color = field_pvt)) +
+  geom_point(size = 2, alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Scatterplot of RDI Difference vs Species Change",
+       x = "SDI Difference",
+       y = "Species Change")
+
+ggplot(merged_data, aes(x = sdi_diff, y = species, color = site_name)) +
+  geom_point(size = 2, alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Scatterplot of RDI Difference vs Species Change",
+       x = "SDI Difference",
+       y = "Species Change")
+```
+
+
+
+
+
+```{r}
+# Define the color palette
+species_colors <- c(
+  "LIDE" = "#0072B2",
+  "TABR" = "#F0E442",  # Yellow
+  "UMCA" = "#E69F00",   # Orange
+  "ABCO" = "#332288", 
+  "ABMAS" = "#88CCEE", 
+  "ACMA" = "#999933",
+  "ARME" = "#AA4499", 
+   "CADE" = "#CC6677", 
+   "CHCH" = "#44AA99",
+   "PILA" = "#882255", 
+   "PIPO" = "#DDCC77", 
+  "PSME" = "#6699cc",
+  "QUCH" = "#117733", 
+  "QUGA" = "#661100", 
+  "QUKE" = "#888888",
+  "CHLA" = "#56B4E9",
+  "PIJE" = "#009E73")
+
+species_patterns <- c(
+  "ABCO" = "none",
+  "ABMAS" = "none",
+  "ACMA" = "none",
+  "ARME" = "none",
+  "CADE" = "none",
+  "CHCH" = "none",
+  "CHLA" = "none",
+  "LIDE" = "none",
+  "PIJE" = "none",
+  "PILA" = "none",
+  "PIPO" = "none",
+  "PSME" = "none",
+  "QUCH" = "none",
+  "QUGA" = "none",
+  "QUKE" = "none",
+  "TABR" = "none",
+  "UMCA" = "none"
+)
+
+# Basal Area
+# Arrange the data by 'pvt' and 'year'
+species_basal_combined <- species_density_combined %>%
+  filter(type == "Basal Area") %>%
+  filter(spcd %in% c("ARME", "PSME", "PIPO", "QUKE", "PILA", "ABCO", "CADE")) %>%
+  arrange(pvt, year) %>%
+  mutate(rodne_year = interaction(pvt, year, sep = " ")) %>%
+  mutate(rodne_year = factor(rodne_year, levels = unique(rodne_year)))
+
+species_basal_combined <- species_basal_combined %>%
+  filter(pvt != "Ponderosa pine - Dry")
+
+# Calculate positions for the dividing lines after every two bars
+vline_positions <- seq(3.5, length(unique(species_basal_combined$rodne_year)), by = 3)
+
+ggplot(species_basal_combined, aes(x = rodne_year, y = percentage, fill = spcd, pattern = spcd)) +
+  geom_bar_pattern(stat = "identity", position = "stack", width = 0.5, 
+                   pattern_density = 0.1, pattern_spacing = 0.03, 
+                   pattern_fill = "black", pattern_key_scale_factor = 1) +  # Adjust scale factor to keep pattern inside bars
+  geom_vline(xintercept = vline_positions, linetype = "dashed", color = "black", size = 0.75) + # Add dividing lines
+  scale_fill_manual(values = species_colors, name = "Species") +
+  scale_pattern_manual(values = species_patterns, name = "Species") +
+  theme_minimal(base_size = 24) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "PVT Composition of Tree Species in 1850, 1911, and 2011 (Basal Area)",
+       x = "Plot and Year", y = "Percentage by Basal Area", fill = "Species") +
+  scale_x_discrete(labels = function(x) gsub("\\.", " ", x)) # Adjust x-axis labels
+
+# Tree Density
+# Arrange the data by 'pvt' and 'year'
+species_trees_combined <- species_density_combined %>%
+  filter(type == "Tree Density") %>%
+  filter(spcd %in% c("ARME", "PSME", "PIPO", "QUKE", "PILA", "ABCO", "CADE")) %>%
+  arrange(pvt, year) %>%
+  mutate(rodne_year = interaction(pvt, year, sep = " ")) %>%
+  mutate(rodne_year = factor(rodne_year, levels = unique(rodne_year)))
+
+species_trees_combined <- species_trees_combined %>%
+  filter(pvt != "Ponderosa pine - Dry")
+
+# Calculate positions for the dividing lines after every two bars
+vline_positions <- seq(3.5, length(unique(species_trees_combined$rodne_year)), by = 3)
+
+ggplot(species_trees_combined, aes(x = rodne_year, y = percentage, fill = spcd, pattern = spcd)) +
+  geom_bar_pattern(stat = "identity", position = "stack", width = 0.5, 
+                   pattern_density = 0.1, pattern_spacing = 0.03, 
+                   pattern_fill = "black", pattern_key_scale_factor = 1) +  # Adjust scale factor to keep pattern inside bars
+  geom_vline(xintercept = vline_positions, linetype = "dashed", color = "black", size = 0.75) + # Add dividing lines
+  scale_fill_manual(values = species_colors, name = "Species") +
+  scale_pattern_manual(values = species_patterns, name = "Species") +
+  theme_minimal(base_size = 24) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(1, -2),  # Adjust legend position (x, y) where (0, 0) is bottom left and (1, 1) is top right
+        legend.box.background = element_rect(fill = "white", color = "black"),
+        legend.background = element_rect(fill = "white")) +
+  labs(title = "(Trees per Acre)",
+       x = "Plot and Year", y = "Percentage by Trees", fill = "Species") +
+  scale_x_discrete(labels = function(x) gsub("\\.", " ", x)) # Adjust x-axis labels
+```
+
+```{r}
+# Define the color palette
+species_colors <- c(
+  "LIDE" = "#0072B2", "TABR" = "#F0E442", "UMCA" = "#E69F00", "ABCO" = "#332288", 
+  "ABMAS" = "#88CCEE", "ACMA" = "#999933", "ARME" = "#AA4499", "CADE" = "#CC6677", 
+  "CHCH" = "#44AA99", "PILA" = "#882255", "PIPO" = "#DDCC77", "PSME" = "#6699cc",
+  "QUCH" = "#117733", "QUGA" = "#661100", "QUKE" = "#888888", "CHLA" = "#56B4E9",
+  "PIJE" = "#009E73"
+)
+
+# Define pattern styles (currently all set to "none")
+species_patterns <- setNames(rep("none", length(species_colors)), names(species_colors))
+
+# Filter dataset and create 'rodne_year' factor
+filtered_data <- species_density_combined %>%
+  filter(type %in% c("Basal Area", "Tree Density"),
+         spcd %in% c("ARME", "PSME", "PIPO", "QUKE", "PILA", "ABCO", "CADE"),
+         pvt != "Ponderosa pine - Dry") %>%
+  arrange(pvt, year) %>%
+  mutate(rodne_year = factor(interaction(pvt, year, sep = " "), levels = unique(interaction(pvt, year, sep = " "))))
+
+# Function to create stacked bar plots
+plot_species_composition <- function(data, plot_type, y_label, title_suffix) {
+  vline_positions <- seq(2.5, length(unique(data$rodne_year)), by = 2)
+  
+  ggplot(data, aes(x = rodne_year, y = percentage, fill = spcd, pattern = spcd)) +
+    geom_bar_pattern(stat = "identity", position = "stack", width = 0.5, 
+                     pattern_density = 0.1, pattern_spacing = 0.03, 
+                     pattern_fill = "black", pattern_key_scale_factor = 1) +
+    geom_vline(xintercept = vline_positions, linetype = "dashed", color = "black", size = 0.75) +
+    scale_fill_manual(values = species_colors, name = "Species") +
+    scale_pattern_manual(values = species_patterns, name = "Species") +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = paste("PVT Composition of Tree Species (", title_suffix, ")", sep = ""),
+         x = "Plot and Year", y = y_label, fill = "Species") +
+    scale_x_discrete(labels = function(x) gsub("\\.", " ", x))
+}
+
+# Generate plots
+basal_area_plot <- plot_species_composition(
+  filtered_data %>% filter(type == "Basal Area"),
+  "Basal Area",
+  "Percentage by Basal Area",
+  "Basal Area"
+)
+
+tree_density_plot <- plot_species_composition(
+  filtered_data %>% filter(type == "Tree Density"),
+  "Tree Density",
+  "Percentage by Trees",
+  "Tree Density (Trees per Acre)"
+)
+
+# Print plots
+print(basal_area_plot)
+print(tree_density_plot)
+
+```
+
+
+```{r}
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Basal Area") %>%
+  filter(spcd %in% c("ARME", "PSME", "PIPO", "QUKE", "PILA", "ABCO", "CADE")) %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "Density Plots 1911 to 2011 Basal Area Percentage Changes",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+# Tree Density
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Tree Density") %>%
+  filter(spcd %in% c("ARME", "PSME", "PIPO", "QUKE", "PILA", "ABCO", "CADE")) %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "Density Plots 1911 to 2011 Stem Density Percentage Changes",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+table(species_density_combined$pvt)
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Basal Area" & pvt == "Douglas-fir - Dry" | pvt == "Tan oak - Douglas-fir - Dry") %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "DF type 1911 to 2011 Basal Area Percentage Changes",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+# Tree Density
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Tree Density" & pvt == "Douglas-fir - Dry" | pvt == "Tan oak - Douglas-fir - Dry") %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "DF type 1911 to 2011 Stem Density Percentage Changes",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Basal Area" & pvt == "Jeffrey pine") %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "JP type 1911 to 2011 Basal Area Percentage Changes",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+# Tree Density
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Tree Density" & pvt == "Jeffrey pine") %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "JP type 1911 to 2011 Stem Density Percentage Changes",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Basal Area" & pvt == "White fir - Cool" | pvt == "White fir - Intermediate") %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "WF type 1911 to 2011 Basal Area Percentage Changes",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+# Tree Density
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Tree Density" & pvt == "White fir - Cool" | pvt == "White fir - Intermediate") %>%
+  filter(spcd == c("QUKE", "PSME", "PIPO", "PILA", "CADE", "ARME", "ABCO")) %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "WF type 1911 to 2011 Stem Density Percentage Changes",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+# Tree Density
+# Calculate the percentage change between 1911 and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Tree Density" & (pvt == "White fir - Cool" | pvt == "White fir - Intermediate")) %>%
+  filter(spcd %in% c("QUKE", "PSME", "PIPO", "PILA", "CADE", "ARME", "ABCO")) %>%
+  spread(year, percentage) %>%  # Spread the data so that 1911 and 2011 are in separate columns
+  mutate(percentage_change = (`2011` - `1911`) / `1911` * 100) %>%  # Calculate the percentage change
+  filter(!is.na(percentage_change))  # Remove any rows with NA percentage change
+
+# Plotting the percentage changes
+ggplot(percentage_changes, aes(x = spcd, y = percentage_change)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "WF Type 1911 to 2011 Stem Density Percentage Changes",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+
+# Tree Density
+# Calculate the percentage change between 1850, 1911, and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Tree Density" & (pvt == "White fir - Cool" | pvt == "White fir - Intermediate")) %>%
+  filter(spcd %in% c("QUKE", "PSME", "PIPO", "PILA", "CADE", "ARME", "ABCO")) %>%
+  spread(year, percentage) %>%  # Spread the data so that 1850, 1911, and 2011 are in separate columns
+  mutate(percentage_change_1911_2011 = (`2011` - `1911`) / `1911` * 100   # Calculate 1911 to 2011 percentage change
+  ) %>%
+  filter(!is.na(percentage_change_1911_2011))  # Remove rows with NA
+
+# Plotting the percentage changes for both periods
+ggplot(percentage_changes, aes(x = spcd)) +
+  geom_boxplot(aes(y = percentage_change_1911_2011), fill = "green", alpha = 0.5, position = position_dodge(width = 0.75)) +  # 1911 to 2011
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "WF Type 1911 to 2011 Stem Density Percentage Changes",
+       x = "Species", y = "Percentage Change (%)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the box plot horizontal
+
+################################################################################
+# Tree Density
+# Calculate the percentage change between 1850, 1911, and 2011 for each species and plot
+percentage_changes <- species_density_combined %>%
+  filter(type == "Tree Density" & (pvt == "White fir - Cool" | pvt == "White fir - Intermediate")) %>%
+  filter(spcd %in% c("QUKE", "PSME", "PIPO", "PILA", "CADE", "ARME", "ABCO")) %>%
+  spread(year, percentage) %>%  # Spread the data so that 1850, 1911, and 2011 are in separate columns
+  mutate(
+    percentage_change_1911_2011 = (`2011` - `1911`) / `1911` * 100   # Calculate 1911 to 2011 percentage change
+  ) %>%
+  filter(!is.na(percentage_change_1911_2011))  # Remove rows with NA
+
+# Prepare the data for plotting, pivot longer for better visualization
+percentage_changes_long <- percentage_changes %>%
+  pivot_longer(cols = c(percentage_change_1911_2011), 
+               names_to = "period", 
+               values_to = "percentage_change") %>%
+  mutate(period = ifelse(period == "percentage_change_1911_2011", "1911-2011"))
+
+# Plotting the percentage changes for both periods
+ggplot(percentage_changes_long, aes(x = spcd, y = percentage_change, fill = period)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.75)) +  # Dodged bars for both periods
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # Dashed line at y = 0
+  theme_minimal() +
+  labs(title = "WF Type 1911 to 2011 Stem Density Percentage Changes",
+       x = "Species", y = "Percentage Change (%)", fill = "Period") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()  # Flip the axes to make the bars horizontal
+
+```
