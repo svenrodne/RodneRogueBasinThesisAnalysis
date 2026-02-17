@@ -10,10 +10,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This is used to find the average change in growth for the tree cores by species. The value of the average percent change will be used to correct the diameters for trees that were modeled to have a larger diameter in 1911 compared to the contemporary diameter.
 
-Clearing the runway
+Clean environment
 
 ```{r}
-# Clearing the runway
+# Clearing the environment for a clean workspace
 rm(list=ls())
 ```
 
@@ -62,10 +62,13 @@ corrected_diams <- corrected_diams %>%
 
 ```
 
-Write the trees_knn file with the adjusted diameters
+Write the trees_knn file with the adjusted diameters and adding in the cm column
 
 ```{r}
 # Combine "corrected_diams" with "correct_diams"
 trees_knn <- dplyr::bind_rows(correct_diams, corrected_diams)
+trees_knn <- trees_knn %>%
+  mutate(diam_cm_1911 = diam_in_1911 * 2.54,
+         diam_cm_2011 = diam_in_2011 * 2.54)
 write.csv(trees_knn, "csv_output_deck/trees_knn.csv", row.names = FALSE)
 ```

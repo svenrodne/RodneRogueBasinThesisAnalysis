@@ -25,9 +25,7 @@ library(grid)
 # Data source
 rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
 rogue_ages_dist <- rogue_ages %>%
-  filter(plot_type == "density") %>%
-  mutate(diam_cm_1911 = diam_in_1911 * 2.54,
-         diam_cm_2011 = diam_in_2011 * 2.54)
+  filter(plot_type == "density")
 rogue_stem_ages <- rogue_ages %>%
   filter(plot_type=="stem" & diam_in_1911>10)
 test <- rogue_ages_dist %>%

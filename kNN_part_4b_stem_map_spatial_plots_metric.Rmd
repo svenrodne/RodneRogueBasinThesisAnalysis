@@ -31,21 +31,13 @@ library(classInt)
 ```{r}
 # Data source
 rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
-rogue_ages <- rogue_ages %>%
-  mutate(diam_cm_1911 = diam_in_1911 * 2.54,
-         diam_cm_2011 = diam_in_2011 * 2.54)
-rogue_stem_ages <- rogue_ages %>%
-  filter(plot_type=="stem" & diam_cm_1911>=24.5)
-summary(rogue_stem_ages$diam_cm_2011)
-#rogue_ages <- read.csv("csv_output_deck/trees_expdec.csv")
-#rogue_ages <- read.csv("csv_output_deck/trees_linear.csv")
 ```
 
 Metric
 
 ```{r}
 # Setting up the data
-# Adding in the disinct code to focus on just trees
+# Adding in the distinct code to focus on just trees
 ###### rodne_pid AA ############################################
 #rodne_pid 1911 aa dataframe
 aa_rogue_ages_1911 <- rogue_ages %>%

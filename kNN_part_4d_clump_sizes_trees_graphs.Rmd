@@ -40,8 +40,6 @@ detach("package:plyr", unload = TRUE)
 
 ```{r}
 rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
-#rogue_ages <- read.csv("csv_output_deck/trees_expdec.csv")
-#rogue_ages <- read.csv("csv_output_deck/trees_linear.csv")
 ```
 
 # Data Prep
