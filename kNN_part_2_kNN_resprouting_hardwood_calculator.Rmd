@@ -1,5 +1,5 @@
 ---
-title: "kNN_part_3.0_resprouting_hardwoods"
+title: "kNN_part_2_resprouting_hardwoods"
 author: "Sven Rodne"
 date: "2024-08-08"
 output: html_document
@@ -47,7 +47,7 @@ diamagedtrees <- left_join(all_trees, diamagedtrees, by = "rodne_uid")
 # Combine the steps into a single pipeline
 treebasal <- diamagedtrees %>%
   # Filter for the non-multistem trees and hardwood species
-  filter(conifer == "Hardwood" & multistem == 1) %>%
+  filter(conifer == "Hardwood" & multistem == 0) %>%
   
   # Calculate the basal area and number of stems for each tree, along with other attributes
   group_by(rodne_pid, trid) %>%
@@ -62,7 +62,7 @@ treebasal <- diamagedtrees %>%
   mutate(diam_cm = sqrt((4 * (tree_basal_sum * 929.0304)) / pi)) %>%
   
   # Filter to include only the non-cored individuals (single-stem trees)
-  #filter(stem_count == 1) %>%
+  filter(stem_count == 1) %>%
   
   # Remove rows with any NA values
   na.omit()
@@ -82,6 +82,8 @@ ggplot(data = treebasal, aes(x = diam_cm, y = rcdm)) +
   ) +
   theme_minimal()
 
+?geom_smooth
+
 # Generalized Linear Model
 gammod1 <- gam(diam_cm ~ rcdm, data = treebasal)
 summary(gammod1)$r.sq
@@ -93,13 +95,11 @@ summary(gammod1)
 ```{r}
 # Generate the left over rcdm at min_pith
 treebasal <- treebasal %>%
-  mutate(leftover_rcdm = ((((pi*((rcdm/2)^2)) - (pi*((((diam_cm/0.235144)-14.251062)/2)^2)))/pi)^0.5)*2,
-         leftover_dbh = (leftover_rcdm*0.235144) + 14.251062) %>%
+  mutate(leftover_rcdm = ((((pi*((rcdm/2)^2)) - (pi*((((diam_cm/0.407348)-5.289323)/2)^2)))/pi)^0.5)*2,
+         leftover_dbh = (leftover_rcdm*0.407348) + 5.289323) %>%
   
 # Filter to include only positive dbh
-  filter(leftover_dbh > 0) 
-# 5.289323
-# 0.407348
+  filter(leftover_dbh > 0)  
 ```
 
 # Redo with the multistem individuals and get the number of individuals that have rcdm/dbh left
@@ -129,8 +129,8 @@ treebasal <- diamagedtrees %>%
   
   # Remove rows with any NA values
   na.omit() %>%
-  mutate(leftover_rcdm = ((((pi*((rcdm/2)^2)) - (pi*((((diam_cm/0.235144)-14.251062)/2)^2)))/pi)^0.5)*2,
-         leftover_dbh = (leftover_rcdm*0.235144) + 14.251062) %>%
+  mutate(leftover_rcdm = ((((pi*((rcdm/2)^2)) - (pi*((((diam_cm/0.407348)-5.289323)/2)^2)))/pi)^0.5)*2,
+         leftover_dbh = (leftover_rcdm*0.407348) + 5.289323) %>%
 
 # Filter to include only positive dbh
   filter(leftover_dbh > 10 & pred_pith > 1911)
@@ -931,8 +931,8 @@ treebasal1 <- diamagedtrees %>%
   
   # Remove rows with any NA values
   na.omit() %>%
-  mutate(leftover_rcdm = ((((pi*((rcdm/2)^2)) - (pi*((((diam_cm/0.235144)-14.251062)/2)^2)))/pi)^0.5)*2,
-         leftover_dbh = (leftover_rcdm*0.235144) + 14.251062) %>%
+  mutate(leftover_rcdm = ((((pi*((rcdm/2)^2)) - (pi*((((diam_cm/0.407348)-5.289323)/2)^2)))/pi)^0.5)*2,
+         leftover_dbh = (leftover_rcdm*0.407348) + 5.289323) %>%
 
 # Filter to include only positive dbh
   filter(leftover_dbh > 10 & pred_pith > 1911)
@@ -1740,8 +1740,8 @@ treebasal2 <- diamagedtrees %>%
   
   # Remove rows with any NA values
   na.omit() %>%
-  mutate(leftover_rcdm = ((((pi*((rcdm/2)^2)) - (pi*((((diam_cm/0.235144)-14.251062)/2)^2)))/pi)^0.5)*2,
-         leftover_dbh = (leftover_rcdm*0.235144) + 14.251062) %>%
+  mutate(leftover_rcdm = ((((pi*((rcdm/2)^2)) - (pi*((((diam_cm/0.407348)-5.289323)/2)^2)))/pi)^0.5)*2,
+         leftover_dbh = (leftover_rcdm*0.407348) + 5.289323) %>%
 
 # Filter to include only positive dbh
   filter(leftover_dbh > 10 & pred_pith > 1911)

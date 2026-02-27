@@ -1,5 +1,5 @@
 ---
-title: "kNN Age and Diameter Algorithms"
+title: "KNN Age and Diameter Algorithms"
 author: "Sven Rodne"
 date: "2024-08-06"
 output: html_document
@@ -22,13 +22,12 @@ library(boot)
 library(dplR)
 ```
 
-Rip out the unholy
+This serves to remove packages from this part which are used in later steps
 
 ```{r}
 detach("package:Rmisc", unload = TRUE)
 detach("package:plyr", unload = TRUE)
 ```
-
 
 # Set seed
 
@@ -38,10 +37,9 @@ rm(list=ls())
 set.seed(12345)
 ```
 
-# Do the mess around
+All of the possible variables used and their predictive statistics that were used
 
 ```{r}
-# Load data
 # ("rodne_nid", "true_age", "rodne_site_ab", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")
 # rmse = 37.618 & r2 = 0.488
 # ("rodne_nid", "true_age", "rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")
@@ -78,7 +76,7 @@ Prior glance at the age data
 # Load full data
 rogue <- read.csv("csv_output_deck/rogue_trees.csv")
 
-# Filter for true age and useful columns
+# Filter for true age and useful columns (this is the data set for only known ages or the KNN known values)
 rogue_known <- subset(rogue, !is.na(true_age))
 cols_to_keep <- c("rodne_uid", "trid", "stid", "true_age", "spcd_mod", "pvt", "spcd", "diam_cm", "elevation", "deficit", "tpi", "insol")
 rogue_known <- rogue_known %>%
@@ -89,11 +87,9 @@ table(rogue_known$spcd_mod)
 table(rogue_known$pvt)
 table(rogue$pvt)
 table(rogue$biostrat)
-
 ```
 
-
-# This is the run for kNN on test age data and then the overall data
+# This is the run for KNN on test age data and then the overall data
 
 ```{r}
 # Load data
@@ -158,7 +154,7 @@ test_y <- test_data$true_age
 # Find the best k
 k_values <- 1:20
 rmse_values <- sapply(k_values, function(k) {
-  predictions <- knn(
+  predictions <- KNN(
     train = train_data[, -which(names(train_data) == 'true_age')],
     test = test_data[, -which(names(test_data) == 'true_age')],
     cl = train_y,
@@ -184,10 +180,10 @@ ggplot(rmse_k, aes(x = x, y = y)) +
 # Test Run
 
 # Function to perform k-NN prediction on test_data
-knn_predict <- function(train_data, test_data, k) {
+KNN_predict <- function(train_data, test_data, k) {
   #predictors <- setdiff(names(train_data), "true_age")
-  #nn <- get.knnx(data = train_data[, predictors],
-  nn <- get.knnx(data = train_data[, c("rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")],
+  #nn <- get.KNNx(data = train_data[, predictors],
+  nn <- get.KNNx(data = train_data[, c("rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")],
                  query = test_data[, c("rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")],
                  k = best_age_k)
   predicted_ages <- apply(nn$nn.index, 1, function(idx) {
@@ -200,7 +196,7 @@ knn_predict <- function(train_data, test_data, k) {
 n_bootstrap <- 1000
 bootstrap_predictions <- replicate(n_bootstrap, {
   bootstrap_sample <- train_data[sample(nrow(train_data), replace = TRUE), ]
-  knn_predict(bootstrap_sample, test_data, k)
+  KNN_predict(bootstrap_sample, test_data, k)
 })
 
 # Calculate the mean prediction and confidence intervals
@@ -249,12 +245,12 @@ age_test_r2
 
 ################################################################################
 ################################################################################
-# Rogue Run
+# Rogue Run (real run)
 
 # Function to perform k-NN prediction on rogue
-knn_predict <- function(rogue_known, rogue, k) {
+KNN_predict <- function(rogue_known, rogue, k) {
   #predictors <- setdiff(names(rogue_known), "true_age")
-  nn <- get.knnx(data = rogue_known[, c("rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")],
+  nn <- get.KNNx(data = rogue_known[, c("rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")],
                  query = rogue[, c("rodne_pid", "spcd_mod", "diam_cm", "elevation", "deficit", "tpi", "insol")],
                  k = best_age_k)
   predicted_ages <- apply(nn$nn.index, 1, function(idx) {
@@ -267,7 +263,7 @@ knn_predict <- function(rogue_known, rogue, k) {
 n_bootstrap <- 1000
 bootstrap_predictions <- replicate(n_bootstrap, {
   bootstrap_sample <- rogue_known[sample(nrow(rogue_known), replace = TRUE), ]
-  knn_predict(bootstrap_sample, rogue, k)
+  KNN_predict(bootstrap_sample, rogue, k)
 })
 
 # Calculate the mean prediction and confidence intervals
@@ -330,7 +326,7 @@ rogue_trees$pred_pith <- rogue_trees$end_year - rogue_trees$predicted_age
 # Reviewing some of the data
 see_rogue <- rogue_trees[c("diam_cm", "spcd", "rodne_pid", "true_age", "ci_age_lower", "predicted_age", "ci_age_upper")]
 
-# End of Age kNN Model
+# End of Age KNN Model
 ```
 
 # Midpoint save for the aged rogue_trees prior to adding the 1911 diameters from cores
@@ -475,13 +471,14 @@ summary(rogue_diams_2011$diam_cm)
 
 # End of Diameter Generator from Cored Data
 ```
-# Midpoint saved agedtrees.csv to reuse for creating the diameter knn
+
+# Midpoint saved agedtrees.csv to reuse for creating the diameter KNN
 
 ```{r}
 write.csv(rogue_trees, "csv_output_deck/agedprediamtrees.csv", row.names = FALSE)
 ```
 
-# F around and F out
+# All possible variables that were tested for predicting tree diameter
 
 ```{r}
 # Doing the mess around
@@ -501,13 +498,12 @@ write.csv(rogue_trees, "csv_output_deck/agedprediamtrees.csv", row.names = FALSE
 # rmse = 9.777 & r2 = 0.707
 ```
 
-
-# 1911 diameter test and full kNN
+# 1911 diameter test and full KNN
 
 ```{r}
 rogue_trees <- read.csv("csv_output_deck/agedprediamtrees.csv")
 
-# Creating the rogue and rogue_original dataframes for kNN
+# Creating the rogue and rogue_original dataframes for KNN
 rogue_original <- rogue_trees
 rogue <- rogue_trees
 
@@ -576,7 +572,7 @@ test_y <- test_data$diam_cm_1911
 # Find the best k
 k_values <- 1:20
 rmse_values <- sapply(k_values, function(k) {
-  predictions <- knn(train = train_data[, -which(names(train_data) == 'diam_cm_1911')], 
+  predictions <- KNN(train = train_data[, -which(names(train_data) == 'diam_cm_1911')], 
                       test = test_data[, -which(names(test_data) == 'diam_cm_1911')], 
                       cl = train_y, k = k)
   return(rmse(test_y, as.numeric(as.character(predictions))))
@@ -600,9 +596,9 @@ ggplot(rmse_k, aes(x = x, y = y)) +
 # Test Run
 
 # Function to perform k-NN prediction on test_data
-knn_predict <- function(train_data, test_data, k) {
+KNN_predict <- function(train_data, test_data, k) {
   #predictors <- setdiff(names(train_data), "diam_cm_1911")
-  nn <- get.knnx(data = train_data[, c("spcd_mod", "biostrat", "diam_cm", "pred_pith")],
+  nn <- get.KNNx(data = train_data[, c("spcd_mod", "biostrat", "diam_cm", "pred_pith")],
                  query = test_data[, c("spcd_mod", "biostrat", "diam_cm", "pred_pith")],
                  k = best_diam_k)
   predicted_diam <- apply(nn$nn.index, 1, function(idx) {
@@ -615,7 +611,7 @@ knn_predict <- function(train_data, test_data, k) {
 n_bootstrap <- 1000
 bootstrap_predictions <- replicate(n_bootstrap, {
   bootstrap_sample <- train_data[sample(nrow(train_data), replace = TRUE), ]
-  knn_predict(bootstrap_sample, test_data, k)
+  KNN_predict(bootstrap_sample, test_data, k)
 })
 
 # Calculate the mean prediction and confidence intervals
@@ -667,9 +663,9 @@ diam_test_r2
 # Rogue Run
 
 # Function to perform k-NN prediction on rogue
-knn_predict <- function(rogue_known, rogue, k) {
+KNN_predict <- function(rogue_known, rogue, k) {
   #predictors <- setdiff(names(rogue_known), "diam_cm_1911")
-  nn <- get.knnx(data = rogue_known[, c("spcd_mod", "biostrat", "diam_cm", "pred_pith")],
+  nn <- get.KNNx(data = rogue_known[, c("spcd_mod", "biostrat", "diam_cm", "pred_pith")],
                  query = rogue[, c("spcd_mod", "biostrat", "diam_cm", "pred_pith")],
                  k = best_diam_k)
   predicted_diam <- apply(nn$nn.index, 1, function(idx) {
@@ -682,7 +678,7 @@ knn_predict <- function(rogue_known, rogue, k) {
 n_bootstrap <- 1000
 bootstrap_predictions <- replicate(n_bootstrap, {
   bootstrap_sample <- rogue_known[sample(nrow(rogue_known), replace = TRUE), ]
-  knn_predict(bootstrap_sample, rogue, k)
+  KNN_predict(bootstrap_sample, rogue, k)
 })
 
 # Calculate the mean prediction and confidence intervals
@@ -747,7 +743,7 @@ see_rogue <- rogue_trees[c("spcd", "rodne_pid", "pred_pith", "end_year", "ci_age
 # See diam_cm_1911 along with each trees diam_cm, pred_pith, and end_year
 see_rogue1 <- rogue_trees[c("rodne_uid", "pred_pith", "end_year", "diam_cm_1911", "predicted_1911_diam", "diam_cm")]
 
-# End of kNN 1911 Diameter Model
+# End of KNN 1911 Diameter Model
 ```
 
 # Midpoint save for after calculating the 1911 diameters
@@ -799,4 +795,4 @@ write.csv(diamagedtrees, "csv_output_deck/diamagedtrees.csv", row.names = FALSE)
 # This is the stop for this part of the code but the next lines will prep the data for the next scripts (part 3)
 ```
 
-# Go to hardwood resprouter (part 3)
+# Go to hardwood resprouter (part 2)

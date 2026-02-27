@@ -29,8 +29,8 @@ rogue_ages_dist <- rogue_ages %>%
 rogue_stem_ages <- rogue_ages %>%
   filter(plot_type=="stem" & diam_in_1911>10)
 test <- rogue_ages_dist %>%
-  filter(diam_cm_2011>=10)
-summary(test$diam_cm_2011)
+  filter(diam_in_2011>=10)
+summary(test$diam_in_2011)
 ```
 
 For the diameter distributions of density plots
