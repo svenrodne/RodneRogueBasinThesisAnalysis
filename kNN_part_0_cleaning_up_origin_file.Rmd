@@ -96,7 +96,7 @@ original_df <- all_rogue
 
 Now to expand all the times that tree tallies were used to create all the rows for each tree
 
-```{r}
+```{r, echo=FALSE}
 ################################################################################
 
 # For tally and diam_cm only
@@ -345,7 +345,7 @@ summary(gammod1)
 # Create single_stemmed dataframe that will be calculated for diam_cm from rcdm
 multi_stemmed <- original_df %>%
   filter(is.na(diam_cm) & rcdm>0) %>%
-  mutate(diam_cm = ((rcdm*0.37254)+6.597175)/tally)
+  mutate(diam_cm = ((rcdm*0.408434)+5.241285)/tally)
 
 # Take the inverse of multi_stemmed to add back to original_df
 non_multi <- anti_join(original_df, multi_stemmed, by = "rodne_uid")
@@ -434,7 +434,7 @@ non_aged_species <- c("ALRU", "CONU", "FRLA", "TSME", "UNKN")
 undateable <- all_trees %>%
   filter(spcd %in% non_aged_species | is.na(diam_cm) | is.na(capo_num))
 
-# Write the undateable csv (trees that are missing critical parameters) (n = 1678) These trees are unfornately removed from further analysis
+# Write the undateable csv (trees that are missing critical parameters) (n = 1678) These trees are unfortunately removed from further analysis
 write.csv(undateable, 
           here("csv_output_deck/undateable.csv"),
           row.names=FALSE)
@@ -583,12 +583,6 @@ snagfalldatedcount <- snagfalldatedcount %>%
 snagfalldatedcount <- snagfalldatedcount %>%
   mutate(snagfall = 1 / (snaglife))
 
-#write a csv
-write.csv(snagfalldatedcount, file = "csv_output_deck/snagfall_values.csv", row.names = FALSE)
-
-# Opening the snag fall values
-snagfalldatedcount <- read.csv("csv_output_deck/snagfall_values.csv")
-
 # Rename the snagfall rate column to snagfall_rogers
 names(snagfalldatedcount)[names(snagfalldatedcount) == "snagfall"] <- "snagfall_rogers"
 
@@ -667,7 +661,6 @@ dead_trees <- merge(dead_trees, consolidated_snag_rates, by.x = c("snag_spcd_gro
 ################################################################################
 # Now apply either the snag fall rate from the Rogers et al (the first data mutations here) or Mellen et al (second) methods/data
 ################################################################################
-# Rogers et al 1984 method
 # 25%, 50%, and 75% Columns that determines how many years need to be taken from year_sampled
 # For 25%
 dead_trees <- dead_trees %>%
@@ -745,7 +738,7 @@ dead_trees <- dead_trees %>%
                       NA_real_))))))  # Handle other cases (if any) with NA or specify a default value
 
 ################################################################################
-# Mellen et al 2012 method
+# mellen et al
 # 25%, 50%, and 75% Columns that determines how many years need to be taken from year_sampled
 # For 25%
 dead_trees <- dead_trees %>%
@@ -853,7 +846,6 @@ dead_trees <- dead_trees %>%
       TRUE ~ NA_real_
     )
   )
-
 
 ################################################################################
 # Write it!

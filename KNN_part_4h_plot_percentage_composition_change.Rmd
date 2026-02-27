@@ -1,5 +1,5 @@
 ---
-title: "KNN_part_6_plot_percentage_composition_change"
+title: "KNN_plot_percentage_composition_change"
 author: "Sven Rodne"
 date: "2025-11-09"
 output: html_document

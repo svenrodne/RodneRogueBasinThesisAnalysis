@@ -1,5 +1,5 @@
 ---
-title: "kNN_part_2_resprouting_hardwoods"
+title: "knn_part_2_resprouting_hardwoods"
 author: "Sven Rodne"
 date: "2024-08-08"
 output: html_document
@@ -9,10 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Clear the runway
+# Clear the environment and set the seed
 
 ```{r}
-# Clear the runway and set the seed
 rm(list=ls())
 set.seed(12345)
 ```
@@ -197,10 +196,7 @@ write.csv(merged_df, "csv_output_deck/newrogue_trees1.csv", row.names = FALSE)
 write.csv(yes_merged_df, "csv_output_deck/rogue_resprouter.csv", row.names = FALSE)
 ```
 
-################################################################################
-################################################################################
-
-# kNN on test age data and then multistem trees
+# knn on test age data and then multistem trees
 
 ```{r}
 # Load data for original data
@@ -402,7 +398,11 @@ age_test_mape <- mean(abs((error_trees$predicted_age - error_trees$true_age) / e
 lm_model <- lm(predicted_age ~ true_age, data = error_trees)
 age_test_r2 <- summary(lm_model)$r.squared
 age_test_r2
+```
 
+# knn Run on resprouting trees
+
+```{r}
 ################################################################################
 ################################################################################
 # Rogue Resprouter Run
@@ -588,13 +588,13 @@ rogue_resprouter_trees <- rogue_resprouter_trees %>%
 write.csv(rogue_resprouter_trees, "csv_output_deck/agedprediamresproutertrees.csv", row.names = FALSE)
 ```
 
-# 1911 diameter test and full kNN
+# 1911 diameter knn test
 
 ```{r}
 rogue_trees <- read.csv("csv_output_deck/agedprediamtrees.csv")
 rogue_resprouter_trees <- read.csv("csv_output_deck/agedprediamresproutertrees.csv")
 
-# Creating the rogue and rogue_original dataframes for kNN
+# Creating the rogue and rogue_original dataframes for knn
 rogue_original <- rogue_trees
 rogue <- rogue_trees
 
@@ -795,9 +795,11 @@ diam_test_mape <- mean(abs((error_trees$predicted_1911_diam - error_trees$diam_c
 lm_model <- lm(predicted_1911_diam ~ diam_cm_1911, data = error_trees)
 diam_test_r2 <- summary(lm_model)$r.squared
 diam_test_r2
+```
 
-################################################################################
-################################################################################
+# knn run on the real full resprouter data
+
+```{r}
 # Rogue Resprouter Run
 
 # Function to perform k-NN prediction on rogue
@@ -1016,7 +1018,7 @@ write.csv(merged_df, "csv_output_deck/newrogue_trees2.csv", row.names = FALSE)
 write.csv(rogue_resprouter1, "csv_output_deck/rogue_resprouter1.csv", row.names = FALSE)
 ```
 
-# kNN on test age data and then multistem trees
+# knn on test age data and then multistem trees
 
 ```{r}
 # Load data for original data
@@ -1218,9 +1220,11 @@ age_test_mape <- mean(abs((error_trees$predicted_age - error_trees$true_age) / e
 lm_model <- lm(predicted_age ~ true_age, data = error_trees)
 age_test_r2 <- summary(lm_model)$r.squared
 age_test_r2
+```
 
-################################################################################
-################################################################################
+# Real run on the resprouters 
+
+```{r}
 # Rogue Resprouter Run
 
 # Function to perform k-NN prediction on rogue_resprouter
@@ -1397,13 +1401,13 @@ rogue_resprouter_trees <- rogue_resprouter_trees %>%
 write.csv(rogue_resprouter_trees, "csv_output_deck/agedprediamresproutertrees1.csv", row.names = FALSE)
 ```
 
-# 1911 diameter test and full kNN
+# 1911 diameter test and full knn
 
 ```{r}
 rogue_trees <- read.csv("csv_output_deck/agedprediamtrees.csv")
 rogue_resprouter_trees <- read.csv("csv_output_deck/agedprediamresproutertrees1.csv")
 
-# Creating the rogue and rogue_original dataframes for kNN
+# Creating the rogue and rogue_original dataframes for knn
 rogue_original <- rogue_trees
 rogue <- rogue_trees
 

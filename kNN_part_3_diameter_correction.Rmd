@@ -72,3 +72,8 @@ trees_knn <- trees_knn %>%
          diam_cm_2011 = diam_in_2011 * 2.54)
 write.csv(trees_knn, "csv_output_deck/trees_knn.csv", row.names = FALSE)
 ```
+
+```{r}
+colnames(trees_knn)
+```
+

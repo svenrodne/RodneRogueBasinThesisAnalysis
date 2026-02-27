@@ -23,6 +23,8 @@ library(ggpattern)
 rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
 ```
 
+Figure 2.3
+
 Attempting to create a graph showing min and max ages for all 17 species
 
 Making the pith year distributions plot that shows each cored species
