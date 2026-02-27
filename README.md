@@ -12,4 +12,4 @@ Sven
 # Data structure
 The significant part of this code rests within the KNN step markdown files. Unless updates to R, R Studio, and associated packages update at a faster rate than I come back and clean the code up from time to time, it should run right through to the results markdowns. If it doesn't, drop me an email and I can try to sift through what went wrong. I'm a frequent flyer in the realm of "Uh-oh, why didn't that work, it should've worked, please work..." 
 
-The folders contain chronologies from tree cores taken for the project, origin data files (which are cleaned in the first couple of steps), 
+The folders contain chronologies from tree cores taken for the project, origin data files (which are cleaned in part 0), graphics from part 4 r markdowns, and the knn modeling within parts 1 - 3.
