@@ -96,7 +96,7 @@ original_df <- all_rogue
 
 Now to expand all the times that tree tallies were used to create all the rows for each tree
 
-```{r, echo=FALSE}
+```{r, include=FALSE}
 ################################################################################
 
 # For tally and diam_cm only
