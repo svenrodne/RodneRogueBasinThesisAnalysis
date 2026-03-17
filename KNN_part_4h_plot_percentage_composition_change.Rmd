@@ -162,6 +162,8 @@ plot_level_basal <- final_merged_estimates %>%
     perc_1911 = ifelse(total_baph_1911 > 0, (baph_1911 / total_baph_1911) * 100, 0),
     perc_2011 = ifelse(total_baph_2011 > 0, (baph_2011 / total_baph_2011) * 100, 0)
   )
+plot_level_basal
+
 
 # Step 2: Average per-species percentages across plots
 species_basal_avg <- plot_level_basal %>%
@@ -178,6 +180,8 @@ species_basal_avg <- plot_level_basal %>%
   mutate(year = recode(year,
                        "avg_perc_1911" = "1911",
                        "avg_perc_2011" = "2011"))
+
+species_basal_avg
 
 # Step 3: Order species by 1911 average dominance
 species_order <- species_basal_avg %>%
@@ -202,6 +206,8 @@ relative_dominance_baph <- ggplot(species_basal_avg, aes(x = spcd, y = perc, fil
     axis.text.x = element_text(angle = 45, hjust = 1),
     plot.title = element_text(face = "bold", hjust = 0.5)
   )
+
+relative_dominance_baph
 
 ggsave("Graphics/relative_dominance_baph.png", plot = relative_dominance_baph, width = 10, height = 6, dpi = 300)
 ```
@@ -415,7 +421,7 @@ relative_dominance_tph <- ggplot(species_tph_avg, aes(x = spcd, y = perc, fill =
     axis.text.x = element_text(angle = 45, hjust = 1),
     plot.title = element_text(face = "bold", hjust = 0.5)
   )
-
+relative_dominance_tph
 ggsave("Graphics/relative_dominance_tph.png", plot = relative_dominance_tph, width = 10, height = 6, dpi = 300)
 ```
 
