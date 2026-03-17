@@ -22,18 +22,9 @@ rm(list=ls())
 # Libraries
 library(dplyr)
 library(ggplot2)
+library(tidyr)
 detach("package:Rmisc", unload = TRUE)
 detach("package:plyr", unload = TRUE)
-```
-
-Strata results
-
-```{r}
-# Bringing in the data
-rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
-strata <- rogue_ages %>%
-  group_by(site_name,rodne_pid, biostrat) %>%
-  summarize()
 ```
 
 # Make sure that plyr isn't on!
@@ -146,10 +137,6 @@ write.csv(basal_summary_table, "csv_output_deck/basal_summary_table.csv", row.na
 plotting the basal area dominance
 
 ```{r}
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-
 # Step 1: Calculate per-plot relative basal area (% of total per plot)
 plot_level_basal <- final_merged_estimates %>%
   group_by(site_name, rodne_pid, year = "1911") %>%
@@ -209,14 +196,15 @@ relative_dominance_baph <- ggplot(species_basal_avg, aes(x = spcd, y = perc, fil
 
 relative_dominance_baph
 
-ggsave("Graphics/relative_dominance_baph.png", plot = relative_dominance_baph, width = 10, height = 6, dpi = 300)
+#ggsave("Graphics/relative_dominance_baph.png", plot = relative_dominance_baph, width = 10, height = 6, dpi = 300)
 ```
 
-
+Setting up the data for stem density dominance
 
 ```{r}
 # Bringing in the data
 rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+table(rogue_ages$site_name)
 
 # Filter to density plots
 rogue_ages <- rogue_ages %>% filter(plot_type=="density")
@@ -361,16 +349,12 @@ density_summary_table <- densityfinal_merged_estimates %>%
   arrange(spcd)
 
 # Write the csv sdi_rdi_comps.csv
-write.csv(density_summary_table, "csv_output_deck/density_summary_table.csv", row.names = FALSE)
+#write.csv(density_summary_table, "csv_output_deck/density_summary_table.csv", row.names = FALSE)
 ```
 
 plot for species dominance for tph
 
 ```{r}
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-
 # Step 1: Calculate per-plot relative tree density (% of total per plot)
 plot_level_tph <- densityfinal_merged_estimates %>%
   group_by(site_name, rodne_pid) %>%
@@ -416,12 +400,233 @@ relative_dominance_tph <- ggplot(species_tph_avg, aes(x = spcd, y = perc, fill =
     y = "Average Relative Tree Density (%)",
     fill = "Year"
   ) +
-  theme_minimal(base_size = 14) +
+  theme_minimal(base_size = 12) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
-    plot.title = element_text(face = "bold", hjust = 0.5)
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.background = element_rect(fill = "white", colour = "black"), # White panel, black border
+    plot.background = element_rect(fill = "white", colour = NA)        # White overall background, no border
   )
 relative_dominance_tph
+
 ggsave("Graphics/relative_dominance_tph.png", plot = relative_dominance_tph, width = 10, height = 6, dpi = 300)
+```
+
+To build the individual site plots (plug and play operation)
+
+```{r}
+# Bringing in the data
+rogue_ages <- read.csv("csv_output_deck/trees_knn.csv")
+table(rogue_ages$site_name)
+
+# Keyword generation for each site to plug and play into the plot and file save
+# The site names for the plot = Ashland, Big Butte, Briggs Secret, Elder Creek, Elliot Ridge, Emigrant Creek, Evans Creek, Grayback Creek, Star Gulch, Taylor Ridge, Trail Creek
+# The site names for the file save = ashland, big_butte, briggs_secret, elder_creek, elliot_ridge, emigrant_creek, evans_creek, grayback_creek, star_gulch, taylor_ridge, trail_creek
+site_name_plug <- "Ashland"
+file_name <- "ashland"
+
+# Filter to density plots
+rogue_ages <- rogue_ages %>% filter(plot_type=="density")
+rogue_ages <- rogue_ages %>% filter(site_name==site_name_plug)
+
+########## 2011
+# Filter and calculate conversion factor and indsdi
+rogue_ages_2011 <- rogue_ages %>%
+  filter(include_2011 == "YES", diam_in_2011 >= 4) %>%
+  mutate(conv_factor = ifelse(plot_size == "0.1", 10, 0.333333333))
+
+# Summarize stem density and SDI for 2011
+# Summarize density and basal area by plot and the individual recon_group (keep the site name and conversion factor with the group_by argument because we'll need them in the next step)
+# Stem Density
+stem_density_estimates_2011 <- rogue_ages_2011 %>%
+  group_by(site_name, rodne_pid, spcd, conv_factor) %>%
+  tally() %>%
+  mutate(stph = n * conv_factor,
+         stpa = stph * 0.404686) %>%
+  select("site_name", "rodne_pid", "spcd", "stph", "stpa")
+
+# Tree Density
+tree_density_estimates_2011 <- rogue_ages_2011 %>%
+  distinct(site_name, rodne_pid, spcd, conv_factor, trid) %>%  # Keep only unique rodne_uid rows
+  group_by(site_name, rodne_pid, spcd, conv_factor) %>%
+  tally() %>%
+  mutate(tph = n * conv_factor,
+         tpa = tph * 0.404686) %>%
+  select("site_name", "rodne_pid", "spcd", "tph", "tpa")
+
+# Join the density and basal values
+density_estimates_2011 <- tree_density_estimates_2011 %>%
+  right_join(stem_density_estimates_2011, by = c("site_name", "rodne_pid", "spcd"))
+
+# Change the column names to reflect the year
+density_estimates_2011 <- density_estimates_2011 %>%
+  rename(tph_2011 = tph,
+         tpa_2011 = tpa,
+         stph_2011 = stph,
+         stpa_2011 = stpa)
+
+########## 1911
+
+# Filter and calculate conversion factor and indsdi
+rogue_ages_1911 <- rogue_ages %>%
+  filter(include_1911 == "YES", diam_in_1911 >= 4) %>%
+  mutate(conv_factor = ifelse(plot_size == "0.1", 10, .333333333))
+
+# Create a data frame with all unique `rodne_pid` values
+all_rodne_pids <- rogue_ages_2011 %>%
+  distinct(rodne_pid, site_name, spcd, conv_factor)
+
+# Summarize density by plot and recon_group
+# Stem Density
+stem_density_estimates_1911 <- rogue_ages_1911 %>%
+  group_by(site_name, rodne_pid, spcd, conv_factor) %>%
+  tally()
+
+# Tree Density
+tree_density_estimates_1911 <- rogue_ages_1911 %>%
+  distinct(site_name, rodne_pid, spcd, conv_factor, trid) %>%
+  group_by(site_name, rodne_pid, spcd, conv_factor) %>%
+  tally()
+
+# Left join to include all rodne_pid values, even those with zero counts
+# Stem Density
+stem_density_estimates_1911 <- all_rodne_pids %>%
+  left_join(stem_density_estimates_1911, by = c("site_name", "rodne_pid", "spcd", "conv_factor")) %>%
+  mutate(n = ifelse(is.na(n), 0, n),  # Replace NA with 0 for rows with no counts
+         stph = n * conv_factor,
+         stpa = stph * 0.404686) %>%
+  select(-n)
+
+# Tree Density
+tree_density_estimates_1911 <- all_rodne_pids %>%
+  left_join(tree_density_estimates_1911, by = c("site_name", "rodne_pid", "spcd", "conv_factor")) %>%
+  mutate(n = ifelse(is.na(n), 0, n),  # Replace NA with 0 for rows with no counts
+         tph = n * conv_factor,
+         tpa = tph * 0.404686) %>%
+  select(-n)
+
+# Join the density and basal values
+density_estimates_1911 <- tree_density_estimates_1911 %>%
+  right_join(stem_density_estimates_1911, by = c("site_name", "rodne_pid", "spcd", "conv_factor"))
+
+# Replace all NA values with 0 in the dataframe
+density_estimates_1911[is.na(density_estimates_1911)] <- 0
+
+# Change the column names to reflect the year
+density_estimates_1911 <- density_estimates_1911 %>%
+  rename(tph_1911 = tph,
+         tpa_1911 = tpa,
+         stph_1911 = stph,
+         stpa_1911 = stpa) %>%
+  select(-conv_factor)
+
+############ Merge
+
+# Merge estimates_2011 and estimates_1911
+densityfinal_merged_estimates <- merge(density_estimates_1911, density_estimates_2011, by = c("site_name", "rodne_pid", "spcd"), all = TRUE)
+
+# Replace all NA values with 0 in the dataframe
+densityfinal_merged_estimates[is.na(densityfinal_merged_estimates)] <- 0
+
+# Round the values
+densityfinal_merged_estimates <- densityfinal_merged_estimates %>%
+  mutate(tph_1911 = round(tph_1911),
+         tpa_1911 = round(tpa_1911),
+         tph_2011 = round(tph_2011),
+         tpa_2011 = round(tpa_2011),
+         stpa_1911 = round(stpa_1911),
+         stph_1911 = round(stph_1911),
+         stpa_2011 = round(stpa_2011),
+         stph_2011 = round(stph_2011))
+
+# Status column for increases, neutral, and decreases
+densityfinal_merged_estimates <- densityfinal_merged_estimates %>%
+  mutate(status = case_when(
+    tph_2011 > tph_1911 ~ "Increase",
+    tph_2011 < tph_1911 ~ "Decrease",
+    tph_2011 == tph_1911 ~ "Neutral",
+    TRUE ~ NA_character_  # handles missing data
+  ))
+
+density_summary_table <- densityfinal_merged_estimates %>%
+  group_by(spcd, status) %>%
+  summarise(count = n(), .groups = "drop_last") %>%
+  mutate(total = sum(count)) %>%
+  ungroup() %>%
+  mutate(perc = round((count / total) * 100, 0)) %>%
+  tidyr::pivot_wider(
+    names_from = status,
+    values_from = c(perc, count),
+    values_fill = 0
+  ) %>%
+  mutate(
+    Increase = sprintf("%d%% (%d)", perc_Increase, count_Increase),
+    Neutral  = sprintf("%d%% (%d)", perc_Neutral, count_Neutral),
+    Decrease = sprintf("%d%% (%d)", perc_Decrease, count_Decrease),
+    Total = rowSums(select(., starts_with("count_")), na.rm = TRUE)
+  ) %>%
+  select(spcd, Increase, Neutral, Decrease, Total) %>%
+  arrange(spcd)
+
+# Write the csv sdi_rdi_comps.csv
+#write.csv(density_summary_table, "csv_output_deck/density_summary_table.csv", row.names = FALSE)
+
+# Plotting the TPH for species for each site
+
+# Step 1: Calculate per-plot relative tree density (% of total per plot)
+plot_level_tph <- densityfinal_merged_estimates %>%
+  group_by(site_name, rodne_pid) %>%
+  mutate(
+    total_tph_1911 = sum(tph_1911, na.rm = TRUE),
+    total_tph_2011 = sum(tph_2011, na.rm = TRUE),
+    perc_1911 = ifelse(total_tph_1911 > 0, (tph_1911 / total_tph_1911) * 100, 0),
+    perc_2011 = ifelse(total_tph_2011 > 0, (tph_2011 / total_tph_2011) * 100, 0)
+  ) %>%
+  ungroup()
+
+# Step 2: Average per-species percentages across plots
+species_tph_avg <- plot_level_tph %>%
+  group_by(spcd) %>%
+  summarise(
+    avg_perc_1911 = mean(perc_1911, na.rm = TRUE),
+    avg_perc_2011 = mean(perc_2011, na.rm = TRUE)
+  ) %>%
+  pivot_longer(
+    cols = starts_with("avg_perc_"),
+    names_to = "year",
+    values_to = "perc"
+  ) %>%
+  mutate(year = recode(year,
+                       "avg_perc_1911" = "1911",
+                       "avg_perc_2011" = "2011"))
+
+# Step 3: Order species by 1911 average dominance
+species_order <- species_tph_avg %>%
+  filter(year == "1911") %>%
+  arrange(desc(perc)) %>%
+  pull(spcd)
+
+species_tph_avg$spcd <- factor(species_tph_avg$spcd, levels = species_order)
+
+# Step 4: Plot
+relative_dominance_tph <- ggplot(species_tph_avg, aes(x = spcd, y = perc, fill = year)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +
+  scale_fill_manual(values = c("1911" = "#2E8B57", "2011" = "#B22222")) +
+  labs(
+    title = paste0(site_name_plug, ": Average Relative Species Dominance by Trees per Hectare per Plot (1911 vs. 2011)"),,
+    x = "Species",
+    y = "Average Relative Tree Density (%)",
+    fill = "Year"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.background = element_rect(fill = "white", colour = "black"), # White panel, black border
+    plot.background = element_rect(fill = "white", colour = NA)        # White overall background, no border
+  )
+relative_dominance_tph
+
+ggsave(paste0("Graphics/", file_name, "_relative_dominance_tph.png"), plot = relative_dominance_tph, width = 10, height = 6, dpi = 300)
 ```
 
